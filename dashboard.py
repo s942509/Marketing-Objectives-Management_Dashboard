@@ -41,7 +41,7 @@ hr { border-color: #252d3d !important; }
 COLOR_PINK      = "#FFABAB"   # Powder Blush
 COLOR_BLUE      = "#83C9FF"   # Maya Blue
 COLOR_DARK_BLUE = "#0068C9"   # Sapphire Sky
-COLOR_DEEP_PINK = "#FF5C7A"   # Deep Rose（第四色，從粉紅加深，與淺藍明顯區隔）
+COLOR_DEEP_PINK = "#FFF4E5"   # 淺膚
 
 PALETTE = [COLOR_DARK_BLUE, COLOR_BLUE, COLOR_PINK, COLOR_DEEP_PINK]
 
