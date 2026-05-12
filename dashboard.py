@@ -10,7 +10,7 @@ import numpy as np
 st.set_page_config(
     page_title="營銷目標管理 Dashboard",
     page_icon="📊",
-    layout="wide",                          # ← 寬版面：最大化圖表寬度
+    layout="centered"#"wide",                  # ← 寬版面：最大化圖表寬度
     initial_sidebar_state="expanded",       # ← 側邊欄初始狀態：展開
 )
 
@@ -75,6 +75,18 @@ hr {
     border-radius: 14px;                    # ← 圓角
     padding: 16px 20px;                     # ← 內邊距 (上下16, 左右20)
     box-shadow: 0 4px 20px rgba(0,0,0,0.4); # ← 陰影效果
+}
+</style>
+/* 限制 plotly chart 最大寬度 */
+[data-testid="stPlotlyChart"] {
+    max-width: 900px;
+    margin: auto;
+}
+
+/* dataframe 也順便不要太寬 */
+[data-testid="stDataFrame"] {
+    max-width: 1100px;
+    margin: auto;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -181,7 +193,7 @@ def base_layout(height=320, legend=True):
         # ─────────────────────────────────────────────────────────────────────
         font=dict(
             color="#8899aa",                # ← 字體顏色 (灰藍色)
-            size=11,                        # ← 預設字號大小
+            size=16,                        # ← 預設字號大小 11e改16
             family="Noto Sans TC",          # ← 字體家族
         ),
         
@@ -208,7 +220,7 @@ def base_layout(height=320, legend=True):
         d["legend"] = dict(
             font=dict(
                 color="#aabbcc",            # ← 圖例文字顏色 (略淺)
-                size=10,                    # ← 圖例字號 (小於主字體)
+                size=14,                    # ← 圖例字號 (小於主字體)10改14
             ),
             bgcolor="rgba(0,0,0,0)",        # ← 圖例背景：透明
             orientation="h",                # ← 圖例方向：水平
@@ -265,7 +277,7 @@ def ax(showgrid=True, title=None, tickangle=0, **kw):
         d["title"] = dict(
             text=title,
             font=dict(
-                size=10,                    # ← 軸標題字號 (小於標籤)
+                size=14,                    # ← 軸標題字號 (小於標籤)10改14
                 color="#667788",            # ← 軸標題顏色 (比標籤更暗)
             )
         )
@@ -283,8 +295,8 @@ def fmt(n):
 # ═════════════════════════════════════════════════════════════════════════════
 # 📊 圖表函數 - 第一層：單個圖表定義
 # ═════════════════════════════════════════════════════════════════════════════
-
-def chart_area_target(height=200):
+#200->150
+def chart_area_target(height=150):
     """
     ┌─────────────────────────────────────────────────────────────────────────┐
     │ 圖表名稱：目標 vs 實際完成 (折線面積圖)                                 │
@@ -360,6 +372,7 @@ def chart_area_target(height=200):
             tickvals=x,
             ticktext=names,                 # ← X軸標籤：姓名
             tickangle=-40,                  # ← 旋轉-40度 (逆時針)
+            tickfont=dict(size=14)     
         ),
         # Y軸：顯示金額，帶網格
         yaxis=ax(
@@ -369,8 +382,8 @@ def chart_area_target(height=200):
     fig.update_layout(**layout)
     return fig
 
-
-def chart_deviation(height=310):
+#310->220
+def chart_deviation(height=220):
     """
     ┌─────────────────────────────────────────────────────────────────────────┐
     │ 圖表名稱：達成率偏差 (水平長條圖)                                       │
@@ -450,8 +463,8 @@ def chart_deviation(height=310):
     fig.update_layout(**layout)
     return fig
 
-
-def chart_top5(height=260):
+#260->200
+def chart_top5(height=200):
     """
     ┌─────────────────────────────────────────────────────────────────────────┐
     │ 圖表名稱：Top 5 提成金額 (水平長條圖，按達成率漸層著色)                 │
@@ -512,8 +525,8 @@ def chart_top5(height=260):
     fig.update_layout(**layout)
     return fig
 
-
-def chart_product_pie(height=260, hole=0.45):
+#260->200
+def chart_product_pie(height=200, hole=0.45):
     """
     ┌─────────────────────────────────────────────────────────────────────────┐
     │ 圖表名稱：產品銷售圓餅圖 (甜甜圈樣式)                                    │
@@ -1206,7 +1219,8 @@ if page == "🏠 首頁總覽":
     st.markdown("---")
     
     # 第二行：2列圖表
-    c1, c2 = st.columns(2)                  # ← 分成左右2列 (各佔50%)
+    c1, c2 = st.columns([1,1])   #元c1, c2 = st.columns(2)  是分成左右2列 (各佔50%)
+   #st.columns([1,1])是左右圖更緊湊
     with c1:
         st.markdown(
             "<div class='section-title'>目標 vs 實際完成</div>",
