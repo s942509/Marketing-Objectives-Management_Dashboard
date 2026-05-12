@@ -130,26 +130,30 @@ def inject_plotly_resizer():
         const box = gd.getBoundingClientRect();
         const w = box.width || 700;
         const h = box.height || 320;
-        const base = clamp(Math.min(w / 58, h / 22), 10, 30);
+
+        const base = clamp(Math.min(w / 50, h / 18), 12, 42);
+        const barText = clamp(base * 1.75, 18, 72);
+        const pieText = clamp(base * 1.65, 18, 66);
 
         return {
             font: Math.round(base),
-            tick: Math.round(base * 0.9),
-            axisTitle: Math.round(base * 0.9),
-            legend: Math.round(base * 0.95),
-            text: Math.round(base * 0.95),
-            pie: Math.round(base * 0.85),
-            marginL: Math.round(clamp(w * 0.08, 56, 150)),
-            marginR: Math.round(clamp(w * 0.04, 28, 90)),
-            marginT: Math.round(clamp(h * 0.16, 48, 120)),
-            marginB: Math.round(clamp(h * 0.16, 46, 120))
+            tick: Math.round(base * 0.95),
+            axisTitle: Math.round(base * 0.95),
+            legend: Math.round(base * 1.05),
+            barText: Math.round(barText),
+            pieText: Math.round(pieText),
+            marginL: Math.round(clamp(w * 0.09, 66, 170)),
+            marginR: Math.round(clamp(w * 0.08, 70, 190)),
+            marginT: Math.round(clamp(h * 0.16, 54, 130)),
+            marginB: Math.round(clamp(h * 0.16, 52, 125))
         };
     }
 
     function relayout(gd) {
         if (!gd || gd.dataset.resizing === "1") return;
-        const Plotly = window.parent.Plotly;
-        if (!Plotly || !Plotly.relayout) return;
+
+        const Plotly = window.parent.Plotly || window.Plotly;
+        if (!Plotly || !Plotly.relayout || !Plotly.restyle) return;
 
         const s = sizesFor(gd);
         gd.dataset.resizing = "1";
@@ -167,19 +171,47 @@ def inject_plotly_resizer():
             "margin.b": s.marginB
         };
 
+        const textSizes = [];
+        const outsideTextSizes = [];
+        const insideTextSizes = [];
+        const textPositions = [];
+        const automargins = [];
+
+        if (gd.data) {
+            gd.data.forEach(function (trace) {
+                if (trace.type === "pie") {
+                    textSizes.push(s.pieText);
+                    outsideTextSizes.push(s.pieText);
+                    insideTextSizes.push(s.pieText);
+                    textPositions.push("outside");
+                    automargins.push(true);
+                } else if (trace.type === "bar") {
+                    textSizes.push(s.barText);
+                    outsideTextSizes.push(s.barText);
+                    insideTextSizes.push(s.barText * 0.9);
+                    textPositions.push(trace.textposition || "outside");
+                    automargins.push(null);
+                } else {
+                    textSizes.push(s.font);
+                    outsideTextSizes.push(s.font);
+                    insideTextSizes.push(s.font);
+                    textPositions.push(trace.textposition || null);
+                    automargins.push(null);
+                }
+            });
+
+            Plotly.restyle(gd, {
+                "textfont.size": textSizes,
+                "outsidetextfont.size": outsideTextSizes,
+                "insidetextfont.size": insideTextSizes,
+                "textposition": textPositions,
+                "automargin": automargins
+            });
+        }
+
         Plotly.relayout(gd, update).finally(function () {
             gd.dataset.resizing = "0";
         });
-
-        if (gd.data) {
-            const traces = gd.data.map(function (t) {
-                if (t.type === "pie") {
-                    return {textfont: {size: s.pie}};
-                }
-                return {textfont: {size: s.text}};
-            });
-            Plotly.restyle(gd, traces);
-        }
     }
 
     function wire() {
@@ -205,9 +237,11 @@ def inject_plotly_resizer():
     wire();
     setInterval(wire, 1200);
     window.parent.addEventListener("resize", wire);
+
     doc.addEventListener("fullscreenchange", function () {
         setTimeout(wire, 250);
         setTimeout(wire, 800);
+        setTimeout(wire, 1500);
     });
 })();
 </script>
@@ -295,18 +329,19 @@ def base_layout(height=320, legend=True):
         plot_bgcolor="rgba(13,17,23,0.6)",
         autosize=True,
         height=height,
-        font=dict(color="#a8b4c2", size=14, family="Noto Sans TC"),
-        margin=dict(l=70, r=40, t=58, b=62),
+        font=dict(color="#a8b4c2", size=15, family="Noto Sans TC"),
+        margin=dict(l=76, r=86, t=58, b=62),
         hoverlabel=dict(
             bgcolor="#161b27",
             bordercolor="#252d3d",
             font=dict(color="#f3f6fb", family="Noto Sans TC"),
         ),
+        uniformtext=dict(mode="show", minsize=13),
     )
 
     if legend:
         layout["legend"] = dict(
-            font=dict(color="#b8c4d2", size=14),
+            font=dict(color="#b8c4d2", size=15),
             bgcolor="rgba(0,0,0,0)",
             orientation="h",
             yanchor="bottom",
@@ -327,13 +362,13 @@ def ax(showgrid=True, title=None, tickangle=0, **kw):
         showgrid=showgrid,
         tickangle=tickangle,
         zeroline=False,
-        tickfont=dict(size=13, color="#c1cad6"),
+        tickfont=dict(size=14, color="#c1cad6"),
     )
 
     if title:
         axis["title"] = dict(
             text=title,
-            font=dict(size=13, color="#8290a3"),
+            font=dict(size=14, color="#8290a3"),
         )
 
     axis.update(kw)
@@ -386,7 +421,8 @@ def chart_deviation(height=260):
         marker=dict(color=colors, line_width=0, opacity=0.88, cornerradius=8),
         text=[f"{r}%" for r in df_s["達成率"]],
         textposition="outside",
-        textfont=dict(size=12, color="#a8b4c2"),
+        textfont=dict(size=18, color="#bcd1ea"),
+        cliponaxis=False,
     ))
 
     layout = base_layout(height, legend=False)
@@ -414,7 +450,7 @@ def chart_top5(height=260):
     fig.update_traces(
         texttemplate="%{text:,.0f}$",
         textposition="outside",
-        textfont=dict(size=13, color="#a8b4c2"),
+        textfont=dict(size=20, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.9, cornerradius=8),
         cliponaxis=False,
     )
@@ -424,7 +460,35 @@ def chart_top5(height=260):
     layout.update(
         xaxis=ax(True, title="提出金額"),
         yaxis=ax(False, title="姓名"),
-        margin=dict(l=76, r=78, t=36, b=58),
+        margin=dict(l=78, r=110, t=38, b=58),
+    )
+    fig.update_layout(**layout)
+    return fig
+
+
+def pie_chart(labels, values, height=300, hole=0.45):
+    colors = (PALETTE * 10)[:len(labels)]
+
+    fig = go.Figure(data=[go.Pie(
+        labels=labels,
+        values=values,
+        hole=hole,
+        marker=dict(colors=colors, line=dict(color="#0d1117", width=2)),
+        textinfo="label+percent",
+        textposition="outside",
+        textfont=dict(size=18, color="#f3f6fb", family="Noto Sans TC"),
+        outsidetextfont=dict(size=18, color="#f3f6fb", family="Noto Sans TC"),
+        insidetextfont=dict(size=16, color="#f3f6fb", family="Noto Sans TC"),
+        automargin=True,
+        pull=[0.035] * len(labels),
+        opacity=0.9,
+        hovertemplate="<b>%{label}</b><br>數值: %{value:,.0f}<br>比例: %{percent}<extra></extra>",
+    )])
+
+    layout = base_layout(height, legend=False)
+    layout.update(
+        margin=dict(l=80, r=150, t=50, b=50),
+        showlegend=False,
     )
     fig.update_layout(**layout)
     return fig
@@ -432,22 +496,7 @@ def chart_top5(height=260):
 
 def chart_product_pie(height=260, hole=0.45):
     df_p = df_sales.groupby("產品名稱")["銷售金額"].sum().reset_index()
-    colors = (PALETTE * 10)[:len(df_p)]
-
-    fig = go.Figure(data=[go.Pie(
-        labels=df_p["產品名稱"],
-        values=df_p["銷售金額"],
-        hole=hole,
-        marker=dict(colors=colors, line=dict(color="#0d1117", width=2)),
-        textinfo="percent+label",
-        textfont=dict(size=13, color="white", family="Noto Sans TC"),
-        pull=[0.03] * len(df_p),
-        opacity=0.9,
-        hovertemplate="<b>%{label}</b><br>金額: $%{value:,.0f}<br>比例: %{percent}<extra></extra>",
-    )])
-
-    fig.update_layout(**base_layout(height))
-    return fig
+    return pie_chart(df_p["產品名稱"], df_p["銷售金額"], height=height, hole=hole)
 
 
 def chart_quarterly(height=400):
@@ -485,7 +534,7 @@ def chart_annual(height=370):
     fig.update_traces(
         texttemplate="%{text:,.0f}$",
         textposition="outside",
-        textfont=dict(size=13),
+        textfont=dict(size=20, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.88, cornerradius=8),
         cliponaxis=False,
     )
@@ -512,7 +561,7 @@ def chart_sales_by_person(height=370):
     fig.update_traces(
         texttemplate="%{text:,.0f}$",
         textposition="outside",
-        textfont=dict(size=13),
+        textfont=dict(size=20, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.88, cornerradius=8),
         cliponaxis=False,
     )
@@ -538,7 +587,7 @@ def chart_product_qty(height=370):
     )
     fig.update_traces(
         textposition="outside",
-        textfont=dict(size=13),
+        textfont=dict(size=20, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.88, cornerradius=8),
         cliponaxis=False,
     )
@@ -553,20 +602,7 @@ def chart_product_qty(height=370):
 def chart_client_grade(height=300):
     df_g = df_clients["客戶等級"].value_counts().reset_index()
     df_g.columns = ["客戶等級", "數量"]
-    colors = (PALETTE * 10)[:len(df_g)]
-
-    fig = go.Figure(data=[go.Pie(
-        labels=df_g["客戶等級"],
-        values=df_g["數量"],
-        hole=0.42,
-        marker=dict(colors=colors, line=dict(color="#0d1117", width=2)),
-        textinfo="percent+label",
-        textfont=dict(size=13, color="white", family="Noto Sans TC"),
-        pull=[0.03] * len(df_g),
-        opacity=0.9,
-    )])
-    fig.update_layout(**base_layout(height))
-    return fig
+    return pie_chart(df_g["客戶等級"], df_g["數量"], height=height, hole=0.42)
 
 
 def chart_client_source(height=300):
@@ -585,7 +621,7 @@ def chart_client_source(height=300):
     )
     fig.update_traces(
         textposition="outside",
-        textfont=dict(size=13),
+        textfont=dict(size=20, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.88, cornerradius=8),
         cliponaxis=False,
     )
@@ -612,7 +648,8 @@ def chart_gift_stacked(height=340):
         marker=dict(color=COLOR_DEEP_PINK, line_width=0, opacity=0.88, cornerradius=6),
         text=[f"{v}%" for v in df_g["已領用%"]],
         textposition="inside",
-        textfont=dict(color="#111827", size=12),
+        textfont=dict(color="#111827", size=18),
+        cliponaxis=False,
     ))
     fig.add_trace(go.Bar(
         name="剩餘",
@@ -622,7 +659,8 @@ def chart_gift_stacked(height=340):
         marker=dict(color=COLOR_DARK_BLUE, line_width=0, opacity=0.88, cornerradius=6),
         text=[f"{v}%" for v in df_g["剩餘%"]],
         textposition="inside",
-        textfont=dict(color="white", size=12),
+        textfont=dict(color="white", size=18),
+        cliponaxis=False,
     ))
 
     layout = base_layout(height)
@@ -647,7 +685,7 @@ def chart_crm(height=300):
     fig.update_traces(
         texttemplate="%{text:,.0f}$",
         textposition="outside",
-        textfont=dict(size=13),
+        textfont=dict(size=20, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.88, cornerradius=8),
         cliponaxis=False,
     )
