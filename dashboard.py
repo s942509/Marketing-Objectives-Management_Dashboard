@@ -10,7 +10,7 @@ import numpy as np
 st.set_page_config(
     page_title="營銷目標管理 Dashboard",
     page_icon="📊",
-    layout="centered"#"wide",                  # ← 寬版面：最大化圖表寬度
+    layout="centered",#"wide"                 # ← 寬版面：最大化圖表寬度
     initial_sidebar_state="expanded",       # ← 側邊欄初始狀態：展開
 )
 
