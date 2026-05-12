@@ -126,26 +126,62 @@ def inject_plotly_resizer():
         return Math.max(min, Math.min(max, v));
     }
 
+    function countBars(trace) {
+        if (!trace) return 1;
+        if (Array.isArray(trace.y)) return Math.max(trace.y.length, 1);
+        if (Array.isArray(trace.x)) return Math.max(trace.x.length, 1);
+        return 1;
+    }
+
     function sizesFor(gd) {
         const box = gd.getBoundingClientRect();
         const w = box.width || 700;
         const h = box.height || 320;
 
-        const base = clamp(Math.min(w / 50, h / 18), 12, 42);
-        const barText = clamp(base * 1.75, 18, 72);
-        const pieText = clamp(base * 1.65, 18, 66);
+        const base = clamp(Math.min(w / 58, h / 22), 11, 38);
+
+        let maxBars = 1;
+        if (gd.data) {
+            gd.data.forEach(function (trace) {
+                if (trace.type === "bar") {
+                    maxBars = Math.max(maxBars, countBars(trace));
+                }
+            });
+        }
+
+        const rowHeight = h / maxBars;
+
+        /*
+          關鍵：
+          - 小圖 bar 很密時，文字大小受 rowHeight 限制
+          - fullscreen 時 rowHeight 變大，文字自然放大
+        */
+        const barText = clamp(
+            Math.min(base * 1.35, rowHeight * 0.42),
+            10,
+            42
+        );
+
+        const insideBarText = clamp(
+            Math.min(base * 1.15, rowHeight * 0.36),
+            9,
+            34
+        );
+
+        const pieText = clamp(base * 1.35, 14, 46);
 
         return {
             font: Math.round(base),
-            tick: Math.round(base * 0.95),
-            axisTitle: Math.round(base * 0.95),
-            legend: Math.round(base * 1.05),
+            tick: Math.round(base * 0.9),
+            axisTitle: Math.round(base * 0.9),
+            legend: Math.round(base * 0.95),
             barText: Math.round(barText),
+            insideBarText: Math.round(insideBarText),
             pieText: Math.round(pieText),
             marginL: Math.round(clamp(w * 0.09, 66, 170)),
-            marginR: Math.round(clamp(w * 0.08, 70, 190)),
-            marginT: Math.round(clamp(h * 0.16, 54, 130)),
-            marginB: Math.round(clamp(h * 0.16, 52, 125))
+            marginR: Math.round(clamp(w * 0.08, 74, 190)),
+            marginT: Math.round(clamp(h * 0.15, 48, 120)),
+            marginB: Math.round(clamp(h * 0.15, 48, 120))
         };
     }
 
@@ -182,14 +218,17 @@ def inject_plotly_resizer():
                 if (trace.type === "pie") {
                     textSizes.push(s.pieText);
                     outsideTextSizes.push(s.pieText);
-                    insideTextSizes.push(s.pieText);
+                    insideTextSizes.push(Math.round(s.pieText * 0.85));
                     textPositions.push("outside");
                     automargins.push(true);
                 } else if (trace.type === "bar") {
-                    textSizes.push(s.barText);
+                    const position = trace.textposition || "outside";
+                    const isInside = position === "inside";
+
+                    textSizes.push(isInside ? s.insideBarText : s.barText);
                     outsideTextSizes.push(s.barText);
-                    insideTextSizes.push(s.barText * 0.9);
-                    textPositions.push(trace.textposition || "outside");
+                    insideTextSizes.push(s.insideBarText);
+                    textPositions.push(position);
                     automargins.push(null);
                 } else {
                     textSizes.push(s.font);
@@ -246,6 +285,7 @@ def inject_plotly_resizer():
 })();
 </script>
 """, height=0)
+
 
 
 inject_plotly_resizer()
@@ -421,7 +461,7 @@ def chart_deviation(height=260):
         marker=dict(color=colors, line_width=0, opacity=0.88, cornerradius=8),
         text=[f"{r}%" for r in df_s["達成率"]],
         textposition="outside",
-        textfont=dict(size=18, color="#bcd1ea"),
+        textfont=dict(size=12, color="#bcd1ea"),
         cliponaxis=False,
     ))
 
@@ -450,7 +490,7 @@ def chart_top5(height=260):
     fig.update_traces(
         texttemplate="%{text:,.0f}$",
         textposition="outside",
-        textfont=dict(size=20, color="#bcd1ea"),
+        textfont=dict(size=12, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.9, cornerradius=8),
         cliponaxis=False,
     )
@@ -476,7 +516,7 @@ def pie_chart(labels, values, height=300, hole=0.45):
         marker=dict(colors=colors, line=dict(color="#0d1117", width=2)),
         textinfo="label+percent",
         textposition="outside",
-        textfont=dict(size=18, color="#f3f6fb", family="Noto Sans TC"),
+        textfont=dict(size=12, color="#f3f6fb", family="Noto Sans TC"),
         outsidetextfont=dict(size=18, color="#f3f6fb", family="Noto Sans TC"),
         insidetextfont=dict(size=16, color="#f3f6fb", family="Noto Sans TC"),
         automargin=True,
@@ -534,7 +574,7 @@ def chart_annual(height=370):
     fig.update_traces(
         texttemplate="%{text:,.0f}$",
         textposition="outside",
-        textfont=dict(size=20, color="#bcd1ea"),
+        textfont=dict(size=12, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.88, cornerradius=8),
         cliponaxis=False,
     )
@@ -561,7 +601,7 @@ def chart_sales_by_person(height=370):
     fig.update_traces(
         texttemplate="%{text:,.0f}$",
         textposition="outside",
-        textfont=dict(size=20, color="#bcd1ea"),
+        textfont=dict(size=12, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.88, cornerradius=8),
         cliponaxis=False,
     )
@@ -587,7 +627,7 @@ def chart_product_qty(height=370):
     )
     fig.update_traces(
         textposition="outside",
-        textfont=dict(size=20, color="#bcd1ea"),
+        textfont=dict(size=12, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.88, cornerradius=8),
         cliponaxis=False,
     )
@@ -621,7 +661,7 @@ def chart_client_source(height=300):
     )
     fig.update_traces(
         textposition="outside",
-        textfont=dict(size=20, color="#bcd1ea"),
+        textfont=dict(size=12, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.88, cornerradius=8),
         cliponaxis=False,
     )
@@ -685,7 +725,7 @@ def chart_crm(height=300):
     fig.update_traces(
         texttemplate="%{text:,.0f}$",
         textposition="outside",
-        textfont=dict(size=20, color="#bcd1ea"),
+        textfont=dict(size=12, color="#bcd1ea"),
         marker=dict(line_width=0, opacity=0.88, cornerradius=8),
         cliponaxis=False,
     )
