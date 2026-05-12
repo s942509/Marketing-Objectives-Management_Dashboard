@@ -4,48 +4,94 @@ import plotly.graph_objects as go
 import plotly.express as px
 import numpy as np
 
-# ── Page config ───────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📌 頁面配置
+# ═════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
     page_title="營銷目標管理 Dashboard",
     page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    layout="wide",                          # ← 寬版面：最大化圖表寬度
+    initial_sidebar_state="expanded",       # ← 側邊欄初始狀態：展開
 )
 
-# ── CSS ───────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 🎨 全局樣式配置（CSS）
+# ═════════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
 
-.stApp { background-color: #0d1117; color: #e0e0e0; font-family: 'Noto Sans TC', sans-serif; }
-[data-testid="stSidebar"] { background-color: #161b27; border-right: 1px solid #252d3d; }
-[data-testid="stSidebar"] * { color: #c9d1e0 !important; }
-.section-title {
-    font-size: 1.15rem; font-weight: 700; color: #e0e0e0;
-    margin-bottom: 0.4rem; letter-spacing: 0.02em;
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* 主應用背景 & 文字顏色 */
+/* ─────────────────────────────────────────────────────────────────────────── */
+.stApp { 
+    background-color: #0d1117;              # ← 深色背景 (GitHub Dark)
+    color: #e0e0e0;                         # ← 主文字顏色 (淡灰)
+    font-family: 'Noto Sans TC', sans-serif; # ← 全局字體：繁體中文
 }
-hr { border-color: #252d3d !important; }
-[data-testid="stMetricValue"] { font-size: 1.8rem !important; font-weight: 700; }
-[data-testid="stMetricDelta"] { font-size: 0.78rem; }
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* 側邊欄樣式 */
+/* ─────────────────────────────────────────────────────────────────────────── */
+[data-testid="stSidebar"] { 
+    background-color: #161b27;              # ← 側邊欄背景 (比主色更暗)
+    border-right: 1px solid #252d3d;        # ← 右邊框線顏色
+}
+[data-testid="stSidebar"] * { 
+    color: #c9d1e0 !important;              # ← 側邊欄文字顏色 (略淺)
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* 區段標題樣式 (用於圖表上方的標題) */
+/* ─────────────────────────────────────────────────────────────────────────── */
+.section-title {
+    font-size: 1.15rem;                     # ← 字號大小
+    font-weight: 700;                       # ← 粗體
+    color: #e0e0e0;                         # ← 標題顏色
+    margin-bottom: 0.4rem;                  # ← 下邊距 (與圖表間距)
+    letter-spacing: 0.02em;                 # ← 字母間距
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* 分隔線 */
+/* ─────────────────────────────────────────────────────────────────────────── */
+hr { 
+    border-color: #252d3d !important;       # ← 分隔線顏色
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* KPI 指標卡片樣式 */
+/* ─────────────────────────────────────────────────────────────────────────── */
+[data-testid="stMetricValue"] { 
+    font-size: 1.8rem !important;           # ← KPI 數值大小
+    font-weight: 700;                       # ← KPI 數值粗體
+}
+[data-testid="stMetricDelta"] { 
+    font-size: 0.78rem;                     # ← KPI 變化值大小 (小於數值)
+}
 [data-testid="metric-container"] {
-    background: linear-gradient(135deg, #161b27 0%, #1c2336 100%);
-    border: 1px solid #252d3d;
-    border-radius: 14px;
-    padding: 16px 20px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    background: linear-gradient(135deg, #161b27 0%, #1c2336 100%); # ← 漸層背景
+    border: 1px solid #252d3d;              # ← 邊框
+    border-radius: 14px;                    # ← 圓角
+    padding: 16px 20px;                     # ← 內邊距 (上下16, 左右20)
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4); # ← 陰影效果
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ── 三色配色定義 ──────────────────────────────────────────────────────────────
-COLOR_PINK      = "#FFABAB"   # Powder Blush
-COLOR_BLUE      = "#83C9FF"   # Maya Blue
-COLOR_DARK_BLUE = "#0068C9"   # Sapphire Sky
-COLOR_DEEP_PINK = "#FFF4E5"   # 淺膚
+# ═════════════════════════════════════════════════════════════════════════════
+# 🎨 色彩調色板定義
+# ═════════════════════════════════════════════════════════════════════════════
+COLOR_DARK_BLUE = "#0068C9"                 # ← 深藍 (主色，用於目標、高值)
+COLOR_BLUE      = "#83C9FF"                 # ← 淺藍 (次色，用於過渡)
+COLOR_PINK      = "#FFABAB"                 # ← 淺粉 (強調色，用於實際值)
+COLOR_DEEP_PINK = "#FFF4E5"                 # ← 淺膚色 (警告色，用於偏差)
 
 PALETTE = [COLOR_DARK_BLUE, COLOR_BLUE, COLOR_PINK, COLOR_DEEP_PINK]
 
-# ── Google Sheet 設定 ─────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📊 Google Sheets 連接配置
+# ═════════════════════════════════════════════════════════════════════════════
 SHEET_ID = "1cBjCD6ql1YliqH1QbbNb3bm41tn4c1D3LCyoZcsgQIM"
 GIDS = {
     "產品資訊":           "2055196795",
@@ -77,7 +123,9 @@ except Exception as e:
     st.error(f"❌ 無法連接 Google Sheet。\n\n錯誤：{e}")
     st.stop()
 
-# ── 數值轉型 ──────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 🔢 數據類型轉換 & KPI 計算
+# ═════════════════════════════════════════════════════════════════════════════
 def to_num(df, cols):
     for c in cols:
         if c in df.columns:
@@ -93,186 +141,566 @@ df_achieve["達成率"] = (
     df_achieve["實際完成"] / df_achieve["當季目標"].replace(0, pd.NA) * 100
 ).round(1).fillna(0)
 
+# ─── KPI 指標計算 ───────────────────────────────────────────────────────────
 total_target  = df_achieve["當季目標"].sum()
 total_achieve = df_achieve["實際完成"].sum()
 total_rate    = round(total_achieve / total_target * 100, 1) if total_target else 0
 total_sales   = df_sales["銷售金額"].sum()
 
-# ── 圖表樣式共用 ──────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📐 圖表樣式配置函數 (共用樣式)
+# ═════════════════════════════════════════════════════════════════════════════
+
 def base_layout(height=320, legend=True):
+    """
+    基礎圖表佈局樣式
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度（px）
+        • 小圖：240-270px （同一行3個或多個）
+        • 中圖：300-370px （同一行2個）
+        • 大圖：400-420px （獨佔一行）
+    legend : bool
+        是否顯示圖例 (True 則圖例在上方)
+    
+    Returns:
+    --------
+    dict : Plotly layout 配置對象
+    """
     d = dict(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(13,17,23,0.6)",
-        font=dict(color="#8899aa", size=11, family="Noto Sans TC"),
-        margin=dict(l=12, r=12, t=36, b=12),
+        # ─────────────────────────────────────────────────────────────────────
+        # 背景顏色設定
+        # ─────────────────────────────────────────────────────────────────────
+        paper_bgcolor="rgba(0,0,0,0)",      # ← 圖表背景：透明 (不顯示邊框背景)
+        plot_bgcolor="rgba(13,17,23,0.6)",  # ← 繪圖區背景：深色半透明
+        
+        # ─────────────────────────────────────────────────────────────────────
+        # 字體設定 (軸標籤、數值標籤等)
+        # ─────────────────────────────────────────────────────────────────────
+        font=dict(
+            color="#8899aa",                # ← 字體顏色 (灰藍色)
+            size=11,                        # ← 預設字號大小
+            family="Noto Sans TC",          # ← 字體家族
+        ),
+        
+        # ─────────────────────────────────────────────────────────────────────
+        # 邊距設定 (留白)
+        # ─────────────────────────────────────────────────────────────────────
+        margin=dict(
+            l=12,                           # ← 左邊距
+            r=12,                           # ← 右邊距
+            t=36,                           # ← 上邊距 (放圖例)
+            b=12,                           # ← 下邊距
+        ),
+        
+        # ─────────────────────────────────────────────────────────────────────
+        # 圖表高度
+        # ─────────────────────────────────────────────────────────────────────
         height=height,
     )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 圖例位置設定
+    # ─────────────────────────────────────────────────────────────────────────
     if legend:
         d["legend"] = dict(
-            font=dict(color="#aabbcc", size=10),
-            bgcolor="rgba(0,0,0,0)",
-            orientation="h",
-            yanchor="bottom", y=1.02,
-            xanchor="center", x=0.5,
+            font=dict(
+                color="#aabbcc",            # ← 圖例文字顏色 (略淺)
+                size=10,                    # ← 圖例字號 (小於主字體)
+            ),
+            bgcolor="rgba(0,0,0,0)",        # ← 圖例背景：透明
+            orientation="h",                # ← 圖例方向：水平
+            yanchor="bottom",               # ← 圖例垂直錨點
+            y=1.02,                         # ← 圖例垂直位置 (圖表上方)
+            xanchor="center",               # ← 圖例水平錨點
+            x=0.5,                          # ← 圖例水平位置 (中心)
         )
     else:
-        d["showlegend"] = False
+        d["showlegend"] = False             # ← 不顯示圖例
+    
     return d
 
 def ax(showgrid=True, title=None, tickangle=0, **kw):
+    """
+    軸線樣式設定 (X軸或Y軸)
+    
+    Parameters:
+    -----------
+    showgrid : bool
+        是否顯示網格線
+    title : str or None
+        軸標題 (e.g., "銷售金額 ($)", "人數")
+    tickangle : int
+        軸標籤旋轉角度 (e.g., -40 = 逆時針40°)
+    
+    Returns:
+    --------
+    dict : Plotly 軸配置對象
+    """
     d = dict(
-        linecolor="#252d3d",
-        gridcolor="#1a2133" if showgrid else "rgba(0,0,0,0)",
-        showgrid=showgrid,
-        tickangle=tickangle,
-        zeroline=False,
+        # ─────────────────────────────────────────────────────────────────────
+        # 線條顏色設定
+        # ─────────────────────────────────────────────────────────────────────
+        linecolor="#252d3d",                # ← 軸線顏色 (深灰)
+        
+        # ─────────────────────────────────────────────────────────────────────
+        # 網格線設定
+        # ─────────────────────────────────────────────────────────────────────
+        gridcolor="#1a2133" if showgrid else "rgba(0,0,0,0)",  # ← 網格顏色 (如果顯示)
+        showgrid=showgrid,                  # ← 是否顯示網格
+        
+        # ─────────────────────────────────────────────────────────────────────
+        # 標籤設定
+        # ─────────────────────────────────────────────────────────────────────
+        tickangle=tickangle,                # ← 標籤旋轉度
+        zeroline=False,                     # ← 不顯示零線
     )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 軸標題設定
+    # ─────────────────────────────────────────────────────────────────────────
     if title:
-        d["title"] = dict(text=title, font=dict(size=10, color="#667788"))
+        d["title"] = dict(
+            text=title,
+            font=dict(
+                size=10,                    # ← 軸標題字號 (小於標籤)
+                color="#667788",            # ← 軸標題顏色 (比標籤更暗)
+            )
+        )
+    
     d.update(kw)
     return d
 
-# ── 格式化金額 ────────────────────────────────────────────────────────────────
 def fmt(n):
+    """
+    格式化金額為字符串
+    Example: 1234567 → "1,234,567$"
+    """
     return f"{n:,.0f}$"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 圖表函數
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📊 圖表函數 - 第一層：單個圖表定義
+# ═════════════════════════════════════════════════════════════════════════════
 
-def chart_area_target(height=300):
-    """折線面積圖（非長條，不需旋轉）"""
-    names = df_achieve["姓名"].tolist()
-    x = list(range(len(names)))
+def chart_area_target(height=200):
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：目標 vs 實際完成 (折線面積圖)                                 │
+    │ 數據來源：df_achieve (當季目標, 實際完成)                              │
+    │ 圖表類型：Scatter + Fill (折線帶填充面積)                              │
+    │ 用途：視覺化業務員的目標達成進度                                        │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 200px for compact view)
+        • 首頁：200-270px
+        • 全覽頁：270px
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備
+    # ─────────────────────────────────────────────────────────────────────────
+    names = df_achieve["姓名"].tolist()     # ← 業務員姓名列表
+    x = list(range(len(names)))             # ← X軸位置 (0, 1, 2, ...)
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 圖表初始化
+    # ─────────────────────────────────────────────────────────────────────────
     fig = go.Figure()
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 第一條線：當季目標 (深藍)
+    # ─────────────────────────────────────────────────────────────────────────
     fig.add_trace(go.Scatter(
-        x=x, y=df_achieve["當季目標"].tolist(), name="當季目標", mode="lines",
-        line=dict(color=COLOR_DARK_BLUE, width=2.5, shape="linear"),
-        fill="tozeroy", fillcolor="rgba(0,104,201,0.25)",
+        x=x, 
+        y=df_achieve["當季目標"].tolist(),
+        name="當季目標",                     # ← 圖例標籤
+        mode="lines",                       # ← 模式：線條
+        line=dict(
+            color=COLOR_DARK_BLUE,          # ← 線條顏色 (深藍)
+            width=2.5,                      # ← 線條寬度 (pt)
+            shape="linear",                 # ← 線型：直線 (不是曲線)
+        ),
+        fill="tozeroy",                     # ← 填充：到0軸
+        fillcolor="rgba(0,104,201,0.25)",   # ← 填充顏色 (深藍25%透明)
     ))
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 第二條線：實際完成 (淺粉)
+    # ─────────────────────────────────────────────────────────────────────────
     fig.add_trace(go.Scatter(
-        x=x, y=df_achieve["實際完成"].tolist(), name="實際完成", mode="lines",
-        line=dict(color=COLOR_PINK, width=2.5, shape="linear"),
-        fill="tozeroy", fillcolor="rgba(255,171,171,0.25)",
+        x=x,
+        y=df_achieve["實際完成"].tolist(),
+        name="實際完成",                     # ← 圖例標籤
+        mode="lines",
+        line=dict(
+            color=COLOR_PINK,               # ← 線條顏色 (淺粉)
+            width=2.5,
+            shape="linear",
+        ),
+        fill="tozeroy",
+        fillcolor="rgba(255,171,171,0.25)",  # ← 填充顏色 (淺粉25%透明)
     ))
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
     layout = base_layout(height)
     layout.update(
-        xaxis=ax(showgrid=False, tickvals=x, ticktext=names, tickangle=-40),
-        yaxis=ax(showgrid=True),
+        # X軸：顯示業務員姓名，旋轉-40度以避免重疊
+        xaxis=ax(
+            showgrid=False,                 # ← X軸不顯示網格 (通常分類軸隱藏)
+            tickvals=x,
+            ticktext=names,                 # ← X軸標籤：姓名
+            tickangle=-40,                  # ← 旋轉-40度 (逆時針)
+        ),
+        # Y軸：顯示金額，帶網格
+        yaxis=ax(
+            showgrid=True,                  # ← Y軸顯示網格 (便於讀值)
+        ),
     )
     fig.update_layout(**layout)
     return fig
 
 
 def chart_deviation(height=310):
-    """達成率偏差 — 水平長條（旋轉90°）"""
-    df_s = df_achieve.sort_values("達成率", ascending=True)
-    dev  = (df_s["達成率"] - 80).tolist()
-    colors = [COLOR_DARK_BLUE if v >= 0 else COLOR_DEEP_PINK for v in dev]
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：達成率偏差 (水平長條圖)                                       │
+    │ 數據來源：df_achieve (達成率)                                           │
+    │ 圖表類型：Bar (horizontal)                                              │
+    │ 用途：顯示每位業務員相對於80%目標的偏差                                 │
+    │       • 綠色(深藍)：達成率 >= 80% (達成目標)                            │
+    │       • 紅色(淺膚)：達成率 < 80% (未達成)                              │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 310px)
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備：按達成率排序，計算偏差值
+    # ─────────────────────────────────────────────────────────────────────────
+    df_s = df_achieve.sort_values("達成率", ascending=True)  # ← 升序排列 (小到大)
+    dev = (df_s["達成率"] - 80).tolist()    # ← 偏差 = 達成率 - 80 (基準)
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 顏色映射：根據正負值選擇顏色
+    # ─────────────────────────────────────────────────────────────────────────
+    colors = [
+        COLOR_DARK_BLUE if v >= 0 else COLOR_DEEP_PINK  # ← >= 0達成, < 0未達成
+        for v in dev
+    ]
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 圖表初始化
+    # ─────────────────────────────────────────────────────────────────────────
     fig = go.Figure()
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 添加水平長條
+    # ─────────────────────────────────────────────────────────────────────────
     fig.add_trace(go.Bar(
-        y=list(range(len(df_s))),
-        x=dev,
-        orientation="h",
-        marker=dict(color=colors, line_width=0, opacity=0.85, cornerradius=10),
-        text=[f"{r}%" for r in df_s["達成率"]],
-        textposition="outside",
-        textfont=dict(size=9, color="#8899aa"),
+        y=list(range(len(df_s))),          # ← Y軸：位置索引 (0, 1, 2, ...)
+        x=dev,                              # ← X軸：偏差值
+        orientation="h",                    # ← 水平方向
+        marker=dict(
+            color=colors,                   # ← 每個柱子顏色
+            line_width=0,                   # ← 邊框寬度 (0 = 無邊框)
+            opacity=0.85,                   # ← 透明度 (85%)
+            cornerradius=10,                # ← 圓角 (px)
+        ),
+        text=[f"{r}%" for r in df_s["達成率"]],  # ← 標籤：達成率百分比
+        textposition="outside",             # ← 標籤位置：柱外側
+        textfont=dict(
+            size=9,                         # ← 標籤字號 (小字)
+            color="#8899aa",                # ← 標籤顏色 (灰藍)
+        ),
     ))
-    layout = base_layout(height, legend=False)
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
+    layout = base_layout(height, legend=False)  # ← 無圖例
     layout.update(
-        yaxis=ax(showgrid=False,
-                 tickvals=list(range(len(df_s))),
-                 ticktext=df_s["姓名"].tolist()),
-        xaxis=ax(showgrid=True, title="偏差 % (基準80%)"),
+        # Y軸：顯示業務員姓名
+        yaxis=ax(
+            showgrid=False,                 # ← 分類軸不顯示網格
+            tickvals=list(range(len(df_s))),
+            ticktext=df_s["姓名"].tolist(),  # ← Y軸標籤：姓名
+        ),
+        # X軸：顯示偏差值，帶網格
+        xaxis=ax(
+            showgrid=True,
+            title="偏差 % (基準80%)",        # ← X軸標題
+        ),
     )
     fig.update_layout(**layout)
     return fig
 
 
 def chart_top5(height=260):
-    """Top 5 提成金額 — 水平長條"""
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：Top 5 提成金額 (水平長條圖，按達成率漸層著色)                 │
+    │ 數據來源：df_achieve (提出金額, 達成率) - 取前5名                      │
+    │ 圖表類型：Bar (horizontal) with color scale                             │
+    │ 用途：突出頂級業務員，顏色深度代表達成率                                │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 260px)
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備：按提成金額取前5名
+    # ─────────────────────────────────────────────────────────────────────────
     df_t = df_achieve.nlargest(5, "提出金額")[["姓名","提出金額","達成率"]]
-    fig = px.bar(df_t, x="提出金額", y="姓名", orientation="h",
-                 color="達成率",
-                 color_continuous_scale=[COLOR_DEEP_PINK, COLOR_DARK_BLUE],
-                 text="提出金額")
-    fig.update_traces(
-        texttemplate="%{text:,.0f}$", textposition="outside",
-        marker=dict(line_width=0, opacity=0.85, cornerradius=10)
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 使用 Plotly Express 快速建圖 (含漸層著色)
+    # ─────────────────────────────────────────────────────────────────────────
+    fig = px.bar(
+        df_t,
+        x="提出金額",                       # ← X軸：提成金額
+        y="姓名",                           # ← Y軸：業務員姓名
+        orientation="h",                    # ← 水平方向
+        color="達成率",                     # ← 顏色維度：達成率 (漸層)
+        color_continuous_scale=[COLOR_DEEP_PINK, COLOR_DARK_BLUE],  # ← 顏色刻度 (淺膚→深藍)
+        text="提出金額",                     # ← 標籤文本
     )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 自訂追蹤樣式
+    # ─────────────────────────────────────────────────────────────────────────
+    fig.update_traces(
+        texttemplate="%{text:,.0f}$",       # ← 標籤格式：金額，帶逗號和$符號
+        textposition="outside",             # ← 標籤位置：柱外側
+        marker=dict(
+            line_width=0,                   # ← 無邊框
+            opacity=0.85,                   # ← 85%透明度
+            cornerradius=10,                # ← 10px圓角
+        )
+    )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
     layout = base_layout(height, legend=False)
-    layout["coloraxis_showscale"] = False
+    layout["coloraxis_showscale"] = False   # ← 隱藏右側顏色刻度條
     layout.update(
-        xaxis=ax(showgrid=True),
-        yaxis=ax(showgrid=False),
+        xaxis=ax(showgrid=True),            # ← X軸顯示網格
+        yaxis=ax(showgrid=False),           # ← Y軸不顯示網格
     )
     fig.update_layout(**layout)
     return fig
 
 
 def chart_product_pie(height=260, hole=0.45):
-    """產品銷售圓餅圖 — 修正：移除 Pie marker 不支援的 opacity"""
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：產品銷售圓餅圖 (甜甜圈樣式)                                    │
+    │ 數據來源：df_sales (產品名稱, 銷售金額)                                 │
+    │ 圖表類型：Pie (donut)                                                    │
+    │ 用途：顯示各產品銷售佔比                                                │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 260px)
+    hole : float
+        甜甜圈中心孔洞大小 (0-1, 0.45 = 45%)
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備：按產品分組、求和
+    # ─────────────────────────────────────────────────────────────────────────
     df_p = df_sales.groupby("產品名稱")["銷售金額"].sum().reset_index()
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 顏色循環分配
+    # ─────────────────────────────────────────────────────────────────────────
     colors_cycle = [COLOR_DARK_BLUE, COLOR_BLUE, COLOR_PINK, COLOR_DEEP_PINK] * 10
-    colors = colors_cycle[:len(df_p)]
+    colors = colors_cycle[:len(df_p)]        # ← 根據產品數取相應顏色
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 圖表定義
+    # ─────────────────────────────────────────────────────────────────────────
     fig = go.Figure(data=[go.Pie(
-        labels=df_p["產品名稱"],
-        values=df_p["銷售金額"],
-        hole=hole,
+        labels=df_p["產品名稱"],             # ← 圓餅標籤
+        values=df_p["銷售金額"],             # ← 圓餅大小 (金額)
+        hole=hole,                          # ← 甜甜圈孔徑 (0.45)
         marker=dict(
-            colors=colors,
-            line=dict(color="#0d1117", width=2),
-            # ✅ 移除不支援的 opacity 屬性
+            colors=colors,                  # ← 每個切片顏色
+            line=dict(
+                color="#0d1117",            # ← 分隔線顏色 (背景色)
+                width=2,                    # ← 分隔線寬度
+            ),
         ),
-        textinfo="percent+label",
-        textfont=dict(size=13, color="white", family="Noto Sans TC"),
-        pull=[0.05] * len(df_p),
-        hovertemplate="<b>%{label}</b><br>金額: $%{value:,.0f}<br>比例: %{percent}<extra></extra>",
-        opacity=0.88,   # ✅ opacity 設在 Pie trace 層級，不在 marker 內
+        textinfo="percent+label",           # ← 文字內容：百分比+產品名
+        textfont=dict(
+            size=13,                        # ← 文字大小
+            color="white",                  # ← 文字顏色 (白色，高對比)
+            family="Noto Sans TC",
+        ),
+        pull=[0.05] * len(df_p),            # ← 拉出效果：5px (所有切片)
+        hovertemplate="<b>%{label}</b><br>金額: $%{value:,.0f}<br>比例: %{percent}<extra></extra>",  # ← 懸停提示
+        opacity=0.88,                       # ← 整體透明度 (88%)
     )])
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
     layout = base_layout(height)
     fig.update_layout(**layout)
     return fig
 
 
 def chart_quarterly(height=400):
-    """各季度目標 — 水平分組長條（旋轉90°），四色明顯區隔"""
-    quarters  = ["第一季度目標","第二季度目標","第三季度目標","第四季度目標"]
-    # 四色：深藍、淺藍、淺粉、深玫瑰 — 相鄰顏色對比明顯
-    colors_q  = [COLOR_DARK_BLUE, COLOR_BLUE, COLOR_PINK, COLOR_DEEP_PINK]
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：各季度目標分佈 (水平分組長條圖)                                │
+    │ 數據來源：df_target (第一季度、二季度、三季度、四季度目標)              │
+    │ 圖表類型：Bar (horizontal, grouped)                                     │
+    │ 用途：比較每位業務員四個季度的目標                                      │
+    │       • 四種顏色明顯區隔：深藍→淺藍→淺粉→淺膚                          │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 400px)
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 季度列表 & 對應顏色
+    # ─────────────────────────────────────────────────────────────────────────
+    quarters = [
+        "第一季度目標",
+        "第二季度目標",
+        "第三季度目標",
+        "第四季度目標",
+    ]
+    colors_q = [
+        COLOR_DARK_BLUE,                    # ← Q1：深藍
+        COLOR_BLUE,                         # ← Q2：淺藍
+        COLOR_PINK,                         # ← Q3：淺粉
+        COLOR_DEEP_PINK,                    # ← Q4：淺膚 (四色對比明顯)
+    ]
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 圖表初始化
+    # ─────────────────────────────────────────────────────────────────────────
     fig = go.Figure()
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 逐季度添加柱狀圖 (分組顯示)
+    # ─────────────────────────────────────────────────────────────────────────
     for i, q in enumerate(quarters):
         fig.add_trace(go.Bar(
-            name=q,
-            y=df_target["姓名"],
-            x=df_target[q],
-            orientation="h",
-            marker=dict(color=colors_q[i], line_width=0, opacity=0.88, cornerradius=8),
+            name=q,                         # ← 圖例標籤：季度名稱
+            y=df_target["姓名"],            # ← Y軸：業務員姓名
+            x=df_target[q],                 # ← X軸：該季度目標
+            orientation="h",                # ← 水平方向
+            marker=dict(
+                color=colors_q[i],          # ← 該季度顏色
+                line_width=0,               # ← 無邊框
+                opacity=0.88,               # ← 88%透明度
+                cornerradius=8,             # ← 8px圓角
+            ),
         ))
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
     layout = base_layout(height)
-    layout["barmode"] = "group"
+    layout["barmode"] = "group"              # ← 柱狀模式：分組並排
     layout.update(
-        yaxis=ax(showgrid=False, tickangle=0),
-        xaxis=ax(showgrid=True),
+        yaxis=ax(showgrid=False, tickangle=0),   # ← Y軸不旋轉 (姓名)
+        xaxis=ax(showgrid=True),                 # ← X軸顯示網格
     )
     fig.update_layout(**layout)
     return fig
 
 
 def chart_annual(height=370):
-    """年度目標 — 水平長條，漸層"""
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：年度目標總覽 (水平長條圖，漸層著色)                            │
+    │ 數據來源：df_target (年度目標)                                          │
+    │ 圖表類型：Bar (horizontal) with color scale                             │
+    │ 用途：顯示各業務員全年目標，漸層顯示大小                                │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 370px)
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備：按年度目標升序排列 (小到大)
+    # ─────────────────────────────────────────────────────────────────────────
     df_s = df_target.sort_values("年度目標", ascending=True)
-    fig = px.bar(df_s, x="年度目標", y="姓名", orientation="h",
-                 color="年度目標",
-                 color_continuous_scale=[COLOR_DARK_BLUE, COLOR_BLUE],
-                 text="年度目標")
-    fig.update_traces(
-        texttemplate="%{text:,.0f}$", textposition="outside",
-        marker=dict(line_width=0, opacity=0.85, cornerradius=10)
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 使用 Plotly Express 快速建圖 (帶漸層著色)
+    # ─────────────────────────────────────────────────────────────────────────
+    fig = px.bar(
+        df_s,
+        x="年度目標",                       # ← X軸：年度目標金額
+        y="姓名",                           # ← Y軸：業務員姓名
+        orientation="h",                    # ← 水平方向
+        color="年度目標",                   # ← 顏色維度：年度目標 (漸層)
+        color_continuous_scale=[COLOR_DARK_BLUE, COLOR_BLUE],  # ← 深藍→淺藍漸層
+        text="年度目標",                     # ← 標籤文本
     )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 自訂追蹤樣式
+    # ─────────────────────────────────────────────────────────────────────────
+    fig.update_traces(
+        texttemplate="%{text:,.0f}$",       # ← 標籤格式：金額
+        textposition="outside",             # ← 標籤位置：柱外側
+        marker=dict(
+            line_width=0,
+            opacity=0.85,
+            cornerradius=10,
+        )
+    )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
     layout = base_layout(height, legend=False)
-    layout["coloraxis_showscale"] = False
+    layout["coloraxis_showscale"] = False   # ← 隱藏顏色刻度條
     layout.update(
         xaxis=ax(showgrid=True),
         yaxis=ax(showgrid=False),
@@ -282,17 +710,54 @@ def chart_annual(height=370):
 
 
 def chart_sales_by_person(height=370):
-    """業務員銷售金額 — 水平長條"""
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：業務員銷售金額 (水平長條圖，漸層著色)                          │
+    │ 數據來源：df_sales (業務員, 銷售金額)                                   │
+    │ 圖表類型：Bar (horizontal) with color scale                             │
+    │ 用途：展示各業務員的實際銷售績效                                        │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 370px)
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備：按業務員分組、求和、升序排列
+    # ─────────────────────────────────────────────────────────────────────────
     df_b = (df_sales.groupby("業務員")["銷售金額"].sum()
             .reset_index().sort_values("銷售金額", ascending=True))
-    fig = px.bar(df_b, x="銷售金額", y="業務員", orientation="h",
-                 color="銷售金額",
-                 color_continuous_scale=[COLOR_DARK_BLUE, COLOR_BLUE],
-                 text="銷售金額")
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 使用 Plotly Express 建圖
+    # ─────────────────────────────────────────────────────────────────────────
+    fig = px.bar(
+        df_b,
+        x="銷售金額",
+        y="業務員",
+        orientation="h",
+        color="銷售金額",
+        color_continuous_scale=[COLOR_DARK_BLUE, COLOR_BLUE],
+        text="銷售金額",
+    )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 自訂追蹤樣式
+    # ─────────────────────────────────────────────────────────────────────────
     fig.update_traces(
-        texttemplate="%{text:,.0f}$", textposition="outside",
+        texttemplate="%{text:,.0f}$",
+        textposition="outside",
         marker=dict(line_width=0, opacity=0.85, cornerradius=10)
     )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
     layout = base_layout(height, legend=False)
     layout["coloraxis_showscale"] = False
     layout.update(
@@ -304,17 +769,53 @@ def chart_sales_by_person(height=370):
 
 
 def chart_product_qty(height=370):
-    """各產品銷售數量 — 水平長條（旋轉90°）"""
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：各產品銷售數量 (水平長條圖，漸層著色)                          │
+    │ 數據來源：df_sales (產品名稱, 數量)                                     │
+    │ 圖表類型：Bar (horizontal) with color scale                             │
+    │ 用途：比較各產品的銷售數量                                              │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 370px)
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備
+    # ─────────────────────────────────────────────────────────────────────────
     df_q = (df_sales.groupby("產品名稱")["數量"].sum()
             .reset_index().sort_values("數量", ascending=True))
-    fig = px.bar(df_q, x="數量", y="產品名稱", orientation="h",
-                 color="數量",
-                 color_continuous_scale=[COLOR_DARK_BLUE, COLOR_BLUE],
-                 text="數量")
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 使用 Plotly Express 建圖
+    # ─────────────────────────────────────────────────────────────────────────
+    fig = px.bar(
+        df_q,
+        x="數量",
+        y="產品名稱",
+        orientation="h",
+        color="數量",
+        color_continuous_scale=[COLOR_DARK_BLUE, COLOR_BLUE],
+        text="數量",
+    )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 自訂追蹤樣式
+    # ─────────────────────────────────────────────────────────────────────────
     fig.update_traces(
         textposition="outside",
         marker=dict(line_width=0, opacity=0.85, cornerradius=10)
     )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
     layout = base_layout(height, legend=False)
     layout["coloraxis_showscale"] = False
     layout.update(
@@ -326,43 +827,109 @@ def chart_product_qty(height=370):
 
 
 def chart_client_grade(height=300):
-    """客戶等級圓餅圖 — 修正：移除 Pie marker 不支援的 opacity"""
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：客戶等級分佈 (甜甜圈圓餅圖)                                    │
+    │ 數據來源：df_clients (客戶等級)                                         │
+    │ 圖表類型：Pie (donut)                                                    │
+    │ 用途：顯示客戶的等級構成                                                │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 300px)
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備：統計各等級客戶數
+    # ─────────────────────────────────────────────────────────────────────────
     df_g = df_clients["客戶等級"].value_counts().reset_index()
     df_g.columns = ["客戶等級","數量"]
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 顏色分配
+    # ─────────────────────────────────────────────────────────────────────────
     colors_cycle = [COLOR_DARK_BLUE, COLOR_BLUE, COLOR_PINK, COLOR_DEEP_PINK] * 10
     colors = colors_cycle[:len(df_g)]
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 圖表定義
+    # ─────────────────────────────────────────────────────────────────────────
     fig = go.Figure(data=[go.Pie(
         labels=df_g["客戶等級"],
         values=df_g["數量"],
-        hole=0.42,
+        hole=0.42,                          # ← 甜甜圈孔徑
         marker=dict(
             colors=colors,
             line=dict(color="#0d1117", width=2),
-            # ✅ 移除不支援的 opacity
         ),
         textinfo="percent+label",
         textfont=dict(size=13, color="white", family="Noto Sans TC"),
-        pull=[0.05] * len(df_g),
-        opacity=0.88,   # ✅ trace 層級
+        pull=[0.05] * len(df_g),            # ← 拉出效果
+        opacity=0.88,
     )])
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
     layout = base_layout(height)
     fig.update_layout(**layout)
     return fig
 
 
 def chart_client_source(height=300):
-    """客戶來源 — 水平長條（旋轉90°）"""
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：客戶來源分佈 (水平長條圖，漸層著色)                            │
+    │ 數據來源：df_clients (客戶來源)                                         │
+    │ 圖表類型：Bar (horizontal) with color scale                             │
+    │ 用途：顯示客戶的來源管道                                                │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 300px)
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備：統計並排序
+    # ─────────────────────────────────────────────────────────────────────────
     df_s = df_clients["客戶來源"].value_counts().reset_index()
     df_s.columns = ["來源","數量"]
     df_s = df_s.sort_values("數量", ascending=True)
-    fig = px.bar(df_s, x="數量", y="來源", orientation="h",
-                 color="數量",
-                 color_continuous_scale=[COLOR_DARK_BLUE, COLOR_BLUE],
-                 text="數量")
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 使用 Plotly Express 建圖
+    # ─────────────────────────────────────────────────────────────────────────
+    fig = px.bar(
+        df_s,
+        x="數量",
+        y="來源",
+        orientation="h",
+        color="數量",
+        color_continuous_scale=[COLOR_DARK_BLUE, COLOR_BLUE],
+        text="數量",
+    )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 自訂追蹤樣式
+    # ─────────────────────────────────────────────────────────────────────────
     fig.update_traces(
         textposition="outside",
         marker=dict(line_width=0, opacity=0.85, cornerradius=10)
     )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
     layout = base_layout(height, legend=False)
     layout["coloraxis_showscale"] = False
     layout.update(
@@ -374,55 +941,138 @@ def chart_client_source(height=300):
 
 
 def chart_gift_stacked(height=340):
-    """禮品庫存 100% 堆疊 — 水平長條（旋轉90°）"""
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：禮品庫存比例 (100% 堆疊水平長條圖)                             │
+    │ 數據來源：df_gifts (禮品名稱, 已領用數量, 剩餘數量)                     │
+    │ 圖表類型：Bar (horizontal, stacked)                                     │
+    │ 用途：視覺化禮品領用進度                                                │
+    │       • 左側(淺膚)：已領用比例                                          │
+    │       • 右側(深藍)：剩餘比例                                            │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 340px)
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備：計算百分比
+    # ─────────────────────────────────────────────────────────────────────────
     df_g = df_gifts.copy()
-    total = df_g["數量"].replace(0, 1)
+    total = df_g["數量"].replace(0, 1)      # ← 避免除以0
     df_g["已領用%"] = (df_g["已領用數量"] / total * 100).round(1)
     df_g["剩餘%"]   = (df_g["剩餘數量"]   / total * 100).round(1)
-
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 圖表初始化
+    # ─────────────────────────────────────────────────────────────────────────
     fig = go.Figure()
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 第一柱：已領用 (淺膚色)
+    # ─────────────────────────────────────────────────────────────────────────
     fig.add_trace(go.Bar(
-        name="已領用",
+        name="已領用",                      # ← 圖例標籤
         y=df_g["禮品名稱"],
         x=df_g["已領用%"],
         orientation="h",
-        marker=dict(color=COLOR_DEEP_PINK, line_width=0, opacity=0.88, cornerradius=6),
+        marker=dict(
+            color=COLOR_DEEP_PINK,          # ← 淺膚色
+            line_width=0,
+            opacity=0.88,
+            cornerradius=6,
+        ),
         text=[f"{v}%" for v in df_g["已領用%"]],
-        textposition="inside",
+        textposition="inside",              # ← 文字在柱內
         textfont=dict(color="white", size=11),
     ))
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 第二柱：剩餘 (深藍)
+    # ─────────────────────────────────────────────────────────────────────────
     fig.add_trace(go.Bar(
         name="剩餘",
         y=df_g["禮品名稱"],
         x=df_g["剩餘%"],
         orientation="h",
-        marker=dict(color=COLOR_DARK_BLUE, line_width=0, opacity=0.88, cornerradius=6),
+        marker=dict(
+            color=COLOR_DARK_BLUE,          # ← 深藍色
+            line_width=0,
+            opacity=0.88,
+            cornerradius=6,
+        ),
         text=[f"{v}%" for v in df_g["剩餘%"]],
         textposition="inside",
         textfont=dict(color="white", size=11),
     ))
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
     layout = base_layout(height)
-    layout["barmode"] = "stack"
+    layout["barmode"] = "stack"              # ← 柱狀模式：堆疊
     layout.update(
         yaxis=ax(showgrid=False),
-        xaxis=ax(showgrid=True, title="佔比 %", range=[0, 105]),
+        xaxis=ax(showgrid=True, title="佔比 %", range=[0, 105]),  # ← X軸範圍 0-105%
     )
     fig.update_layout(**layout)
     return fig
 
 
 def chart_crm(height=300):
-    """客戶維護費用 — 水平長條（旋轉90°）"""
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 圖表名稱：客戶關係維護費用 (水平長條圖，漸層著色)                        │
+    │ 數據來源：df_crm (維護內容, 費用)                                       │
+    │ 圖表類型：Bar (horizontal) with color scale                             │
+    │ 用途：顯示各維護項目的費用支出                                          │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Parameters:
+    -----------
+    height : int
+        圖表高度 (default: 300px)
+    
+    Returns:
+    --------
+    fig : go.Figure
+    """
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備：按維護內容分組、求和、升序排列
+    # ─────────────────────────────────────────────────────────────────────────
     df_c = (df_crm.groupby("維護內容")["費用"].sum()
             .reset_index().sort_values("費用", ascending=True))
-    fig = px.bar(df_c, x="費用", y="維護內容", orientation="h",
-                 color="費用",
-                 color_continuous_scale=[COLOR_DARK_BLUE, COLOR_DEEP_PINK],
-                 text="費用")
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 使用 Plotly Express 建圖
+    # ─────────────────────────────────────────────────────────────────────────
+    fig = px.bar(
+        df_c,
+        x="費用",
+        y="維護內容",
+        orientation="h",
+        color="費用",
+        color_continuous_scale=[COLOR_DARK_BLUE, COLOR_DEEP_PINK],  # ← 深藍→淺膚
+        text="費用",
+    )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 自訂追蹤樣式
+    # ─────────────────────────────────────────────────────────────────────────
     fig.update_traces(
-        texttemplate="%{text:,.0f}$", textposition="outside",
+        texttemplate="%{text:,.0f}$",
+        textposition="outside",
         marker=dict(line_width=0, opacity=0.85, cornerradius=10)
     )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 佈局配置
+    # ─────────────────────────────────────────────────────────────────────────
     layout = base_layout(height, legend=False)
     layout["coloraxis_showscale"] = False
     layout.update(
@@ -433,36 +1083,89 @@ def chart_crm(height=300):
     return fig
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# KPI 列
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📊 KPI 指標卡片行 (4列)
+# ═════════════════════════════════════════════════════════════════════════════
 def kpi_row():
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("當季總目標",   fmt(total_target))
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 佈局：4 列 KPI 卡片（均分寬度）                                         │
+    │ 卡片樣式：                                                              │
+    │   • 背景：深灰漸層                                                      │
+    │   • 邊框：細淡灰                                                        │
+    │   • 圓角：14px                                                          │
+    │   • 陰影：深色陰影                                                      │
+    │   • 數值：1.8rem 粗體 (自動顯示)                                        │
+    │   • 差異：0.78rem (自動顯示)                                            │
+    └─────────────────────────────────────────────────────────────────────────┘
+    """
+    k1, k2, k3, k4 = st.columns(4)          # ← 均分 4 列
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 第1卡：當季總目標
+    # ─────────────────────────────────────────────────────────────────────────
+    k1.metric(
+        "當季總目標",                       # ← 卡片標題
+        fmt(total_target)                   # ← 卡片數值
+    )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 第2卡：當季實際完成
+    # ─────────────────────────────────────────────────────────────────────────
     k2.metric("當季實際完成", fmt(total_achieve))
-    k3.metric("整體達成率",   f"{total_rate}%",
-              delta=f"{'↑' if total_rate >= 80 else '↓'} 目標 80%")
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 第3卡：整體達成率 (含差異指示)
+    # ─────────────────────────────────────────────────────────────────────────
+    k3.metric(
+        "整體達成率",
+        f"{total_rate}%",                   # ← 百分比數值
+        delta=f"{'↑' if total_rate >= 80 else '↓'} 目標 80%"  # ← 差異提示
+    )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 第4卡：銷售金額合計
+    # ─────────────────────────────────────────────────────────────────────────
     k4.metric("銷售金額合計", fmt(total_sales))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SIDEBAR
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📱 側邊欄頁面導航
+# ═════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
+    # ─────────────────────────────────────────────────────────────────────────
+    # 標題
+    # ─────────────────────────────────────────────────────────────────────────
     st.markdown("### 📋 主選單")
     st.markdown("---")
-    page = st.radio("", [
-        "🏠 首頁總覽",
-        "📊 全覽 Dashboard",
-        "🎯 目標達成分析",
-        "💰 銷售明細",
-        "👥 客戶分析",
-        "🎁 禮品庫存",
-    ], label_visibility="collapsed")
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 頁面選擇單選按鈕 (radio button)
+    # ─────────────────────────────────────────────────────────────────────────
+    page = st.radio(
+        "",                                 # ← 無標籤 (使用 label_visibility)
+        [
+            "🏠 首頁總覽",                  # ← 頁面 1：KPI + 2x2 圖表
+            "📊 全覽 Dashboard",             # ← 頁面 2：全部圖表概覽
+            "🎯 目標達成分析",               # ← 頁面 3：目標詳細數據 + 季度圖表
+            "💰 銷售明細",                  # ← 頁面 4：銷售表單 + 分析圖表
+            "👥 客戶分析",                  # ← 頁面 5：客戶圓餅 + 來源 + 維護費用
+            "🎁 禮品庫存",                  # ← 頁面 6：禮品表單 + 堆疊圖表
+        ],
+        label_visibility="collapsed",        # ← 隱藏無標籤單選框
+    )
     st.markdown("---")
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 重新整理按鈕
+    # ─────────────────────────────────────────────────────────────────────────
     if st.button("🔄 重新整理資料"):
-        st.cache_data.clear()
-        st.rerun()
+        st.cache_data.clear()               # ← 清除緩存
+        st.rerun()                          # ← 重新執行應用
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 頁腳提示
+    # ─────────────────────────────────────────────────────────────────────────
     st.markdown(
         "<div style='font-size:0.72rem;color:#445;margin-top:10px;'>"
         "資料來源：Google Sheets<br>每 10 分鐘自動更新</div>",
@@ -470,175 +1173,471 @@ with st.sidebar:
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE : 首頁總覽
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📄 PAGE 1 : 首頁總覽
+# ═════════════════════════════════════════════════════════════════════════════
 if page == "🏠 首頁總覽":
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 頁面：首頁總覽                                                          │
+    │ 佈局結構：                                                              │
+    │  ┌─────────────────────────────────────────────────────────────────────┐
+    │  │ [標題] 營銷目標管理 Dashboard                                        │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [KPI 行] 當季總目標 | 當季實際完成 | 整體達成率 | 銷售金額合計       │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [行1] [圖表1] 目標vs實際    |    [圖表2] 達成率排名                 │
+    │  │ [行2] [圖表3] 提成金額Top5 |    [圖表4] 產品銷售圓餅                │
+    │  └─────────────────────────────────────────────────────────────────────┘
+    │ 視覺設計：
+    │  • 頁面寬度：滿寬 (layout="wide")
+    │  • 圖表尺寸：1行2列 (st.columns(2))
+    │  • 標題字號：1.15rem (section-title class)
+    │  • 圖表高度：200-260px (緊湊設計)
+    │  • 間距：使用 st.markdown("---") 分隔
+    └─────────────────────────────────────────────────────────────────────────┘
+    """
+    
     st.markdown("## 營銷目標管理 Dashboard")
     st.markdown("---")
+    
+    # 第一行：KPI 指標
     kpi_row()
     st.markdown("---")
-
-    c1, c2 = st.columns(2)
+    
+    # 第二行：2列圖表
+    c1, c2 = st.columns(2)                  # ← 分成左右2列 (各佔50%)
     with c1:
-        st.markdown("<div class='section-title'>目標 vs 實際完成</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>目標 vs 實際完成</div>",
+            unsafe_allow_html=True
+        )
+        # ────────────────────────────────────────────────────────────────────
+        # 圖表寬度設定：use_container_width=True (充滿容器寬度)
+        # ────────────────────────────────────────────────────────────────────
         st.plotly_chart(chart_area_target(), use_container_width=True)
+    
     with c2:
-        st.markdown("<div class='section-title'>達成率排名（基準 80%）</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>達成率排名（基準 80%）</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_deviation(), use_container_width=True)
-
+    
     st.markdown("---")
+    
+    # 第三行：2列圖表
     b1, b2 = st.columns(2)
     with b1:
-        st.markdown("<div class='section-title'>提成金額 Top 5</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>提成金額 Top 5</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_top5(), use_container_width=True)
+    
     with b2:
-        st.markdown("<div class='section-title'>產品銷售金額分佈</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>產品銷售金額分佈</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_product_pie(), use_container_width=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE : 全覽 Dashboard
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📄 PAGE 2 : 全覽 Dashboard
+# ═════════════════════════════════════════════════════════════════════════════
 elif page == "📊 全覽 Dashboard":
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 頁面：全覽 Dashboard                                                     │
+    │ 佈局結構：                                                              │
+    │  ┌─────────────────────────────────────────────────────────────────────┐
+    │  │ [標題] 📊 全覽 Dashboard                                             │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [KPI 行] 4 個 KPI 卡片                                              │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [行1: 2列] 目標vs實際(270px) | 達成率排名(270px)                    │
+    │  │ [行2: 3列] 提成Top5(240) | 產品圓餅(240) | 客戶等級(240)            │
+    │  │ [行3: 2列] 業務員銷售金額(300) | 禮品庫存比例(300)                  │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [大表單] 銷售明細（可縮放，高度280px）                              │
+    │  └─────────────────────────────────────────────────────────────────────┘
+    │ 視覺設計：
+    │  • 頁面寬度：滿寬
+    │  • 密度：中等 (比首頁多圖)
+    │  • 圖表高度：240-300px
+    │  • 表單行數：約10-15行 (height=280)
+    └─────────────────────────────────────────────────────────────────────────┘
+    """
+    
     st.markdown("## 📊 全覽 Dashboard")
     st.markdown("---")
+    
     kpi_row()
     st.markdown("---")
-
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 第一行：2 列圖表
+    # ─────────────────────────────────────────────────────────────────────────
     r1a, r1b = st.columns(2)
     with r1a:
-        st.markdown("<div class='section-title'>目標 vs 實際完成</div>", unsafe_allow_html=True)
-        st.plotly_chart(chart_area_target(270), use_container_width=True)
+        st.markdown(
+            "<div class='section-title'>目標 vs 實際完成</div>",
+            unsafe_allow_html=True
+        )
+        st.plotly_chart(chart_area_target(270), use_container_width=True)  # ← 高度 270px
     with r1b:
         st.markdown("<div class='section-title'>達成率排名</div>", unsafe_allow_html=True)
         st.plotly_chart(chart_deviation(270), use_container_width=True)
-
-    r2a, r2b, r2c = st.columns(3)
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 第二行：3 列圖表 (小圖，適合 3 列)
+    # ─────────────────────────────────────────────────────────────────────────
+    r2a, r2b, r2c = st.columns(3)           # ← 3 列均分
     with r2a:
         st.markdown("<div class='section-title'>提成 Top 5</div>", unsafe_allow_html=True)
-        st.plotly_chart(chart_top5(240), use_container_width=True)
+        st.plotly_chart(chart_top5(240), use_container_width=True)  # ← 高度 240px
     with r2b:
-        st.markdown("<div class='section-title'>產品銷售分佈</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>產品銷售分佈</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_product_pie(240), use_container_width=True)
     with r2c:
-        st.markdown("<div class='section-title'>客戶等級分佈</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>客戶等級分佈</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_client_grade(240), use_container_width=True)
-
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 第三行：2 列圖表 (中圖)
+    # ─────────────────────────────────────────────────────────────────────────
     r3a, r3b = st.columns(2)
     with r3a:
-        st.markdown("<div class='section-title'>業務員銷售金額</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>業務員銷售金額</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_sales_by_person(300), use_container_width=True)
     with r3b:
-        st.markdown("<div class='section-title'>禮品庫存比例</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>禮品庫存比例</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_gift_stacked(300), use_container_width=True)
-
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 銷售明細數據表
+    # ─────────────────────────────────────────────────────────────────────────
     st.markdown("---")
-    st.markdown("<div class='section-title'>銷售明細（可縮放）</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='section-title'>銷售明細（可縮放）</div>",
+        unsafe_allow_html=True
+    )
+    
     cols = ["單號","銷售日期","業務員","公司名稱","產品名稱","數量","銷售單價","銷售金額"]
     avail = [c for c in cols if c in df_sales.columns]
     df_s_fmt = df_sales[avail].copy()
+    
+    # 格式化金額列
     for c in ["銷售金額","銷售單價"]:
         if c in df_s_fmt.columns:
             df_s_fmt[c] = df_s_fmt[c].apply(lambda x: f"{x:,.0f}$")
-    st.dataframe(df_s_fmt, use_container_width=True, hide_index=True, height=280)
+    
+    # ────────────────────────────────────────────────────────────────────────
+    # 表單配置：
+    # • use_container_width=True：充滿容器寬度
+    # • hide_index=True：隱藏行號
+    # • height=280：固定高度 (280px)，超過則出現滾動條
+    # ────────────────────────────────────────────────────────────────────────
+    st.dataframe(
+        df_s_fmt,
+        use_container_width=True,           # ← 充滿寬度
+        hide_index=True,                    # ← 隱藏索引列
+        height=280,                         # ← 固定高度 (超過內部滾動)
+    )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE : 目標達成分析
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📄 PAGE 3 : 目標達成分析
+# ═════════════════════════════════════════════════════════════════════════════
 elif page == "🎯 目標達成分析":
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 頁面：目標達成分析                                                      │
+    │ 佈局結構：                                                              │
+    │  ┌─────────────────────────────────────────────────────────────────────┐
+    │  │ [標題] 🎯 業務員目標達成分析                                         │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [數據表] 姓名 | 當季目標 | 實際完成 | 達成率 | 提出金額 | 排名       │
+    │  │          (高度 460px，顯示所有業務員)                               │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [行1: 2列] 各季度目標(400) | 年度目標總覽(370)                      │
+    │  └─────────────────────────────────────────────────────────────────────┘
+    │ 視覺設計：
+    │  • 重點：詳細數據表格 (超過首頁)
+    │  • 表單高度：460px (可顯示12-15行數據)
+    │  • 圖表配置：2列，左圖較寬
+    └─────────────────────────────────────────────────────────────────────────┘
+    """
+    
     st.markdown("## 🎯 業務員目標達成分析")
     st.markdown("---")
-
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據表：目標達成分析摘要
+    # ─────────────────────────────────────────────────────────────────────────
     df_show = df_achieve[["姓名","當季目標","實際完成","達成率","提出金額","排名"]].copy()
     df_show["當季目標"] = df_show["當季目標"].apply(fmt)
     df_show["實際完成"] = df_show["實際完成"].apply(fmt)
     df_show["提出金額"] = df_show["提出金額"].apply(fmt)
     df_show["達成率"]   = df_show["達成率"].apply(lambda x: f"{x}%")
-    st.dataframe(df_show, use_container_width=True, hide_index=True, height=460)
-
+    
+    # ────────────────────────────────────────────────────────────────────────
+    # 表單配置：
+    # • height=460：較大高度，顯示更多行
+    # ────────────────────────────────────────────────────────────────────────
+    st.dataframe(
+        df_show,
+        use_container_width=True,
+        hide_index=True,
+        height=460,                         # ← 高度 460px
+    )
+    
     st.markdown("---")
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 圖表行：季度和年度分析
+    # ─────────────────────────────────────────────────────────────────────────
     t1, t2 = st.columns(2)
     with t1:
-        st.markdown("<div class='section-title'>各季度目標分佈</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>各季度目標分佈</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_quarterly(), use_container_width=True)
     with t2:
-        st.markdown("<div class='section-title'>年度目標總覽</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>年度目標總覽</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_annual(), use_container_width=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE : 銷售明細
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📄 PAGE 4 : 銷售明細
+# ═════════════════════════════════════════════════════════════════════════════
 elif page == "💰 銷售明細":
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 頁面：銷售明細                                                          │
+    │ 佈局結構：                                                              │
+    │  ┌─────────────────────────────────────────────────────────────────────┐
+    │  │ [標題] 💰 銷售明細                                                    │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [滑動條] 顯示資料筆數範圍（1-total_rows）                            │
+    │  │ [數據表] 分頁顯示（根據滑動條範圍）                                  │
+    │  │          高度：400px                                                │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [行1: 2列] 業務員銷售金額(370) | 各產品銷售數量(370)                │
+    │  └─────────────────────────────────────────────────────────────────────┘
+    │ 互動特性：
+    │  • 滑動條：動態範圍選擇 (1 到總行數，預設1-14)
+    │  • 表單：根據滑動條範圍更新內容
+    │  • 表單高度：400px
+    └─────────────────────────────────────────────────────────────────────────┘
+    """
+    
     st.markdown("## 💰 銷售明細")
     st.markdown("---")
-
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 數據準備
+    # ─────────────────────────────────────────────────────────────────────────
     cols = ["單號","銷售日期","業務員","公司名稱","產品名稱","數量","銷售單價","銷售金額"]
     avail = [c for c in cols if c in df_sales.columns]
     df_disp = df_sales[avail].copy()
     for c in ["銷售金額","銷售單價"]:
         if c in df_disp.columns:
             df_disp[c] = df_disp[c].apply(lambda x: f"{x:,.0f}$")
-
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 互動滑動條：範圍選擇
+    # ─────────────────────────────────────────────────────────────────────────
     total_rows = len(df_disp)
-    row_range = st.slider("顯示資料筆數範圍（滾輪調整）", 1, total_rows,
-                           (1, min(total_rows, 14)), key="sales_range")
-    st.dataframe(df_disp.iloc[row_range[0]-1:row_range[1]],
-                 use_container_width=True, hide_index=True, height=400)
-
+    row_range = st.slider(
+        "顯示資料筆數範圍（滾輪調整）",
+        1,                                  # ← 最小值
+        total_rows,                         # ← 最大值
+        (1, min(total_rows, 14)),           # ← 預設範圍 (1-14 或全部)
+        key="sales_range",
+    )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 根據滑動條顯示表單
+    # ─────────────────────────────────────────────────────────────────────────
+    st.dataframe(
+        df_disp.iloc[row_range[0]-1:row_range[1]],  # ← 根據範圍切片
+        use_container_width=True,
+        hide_index=True,
+        height=400,                         # ← 固定高度 400px
+    )
+    
     st.markdown("---")
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 分析圖表：2 列
+    # ─────────────────────────────────────────────────────────────────────────
     s1, s2 = st.columns(2)
     with s1:
-        st.markdown("<div class='section-title'>業務員銷售金額</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>業務員銷售金額</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_sales_by_person(), use_container_width=True)
     with s2:
-        st.markdown("<div class='section-title'>各產品銷售數量</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>各產品銷售數量</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_product_qty(), use_container_width=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE : 客戶分析
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📄 PAGE 5 : 客戶分析
+# ═════════════════════════════════════════════════════════════════════════════
 elif page == "👥 客戶分析":
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 頁面：客戶分析                                                          │
+    │ 佈局結構：                                                              │
+    │  ┌─────────────────────────────────────────────────────────────────────┐
+    │  │ [標題] 👥 客戶分析                                                    │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [行1: 2列] 客戶等級分佈(300) | 客戶來源分佈(300)                    │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [數據表] 客戶列表 (高度 400px)                                       │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [條件圖表] 客戶關係維護費用 (如果有費用數據)                        │
+    │  └─────────────────────────────────────────────────────────────────────┘
+    │ 視覺設計：
+    │  • 圖表：兩個圓餅，並排展示
+    │  • 表單：客戶完整列表
+    │  • 條件圖表：需檢查費用數據才顯示
+    └─────────────────────────────────────────────────────────────────────────┘
+    """
+    
     st.markdown("## 👥 客戶分析")
     st.markdown("---")
-
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 圖表行：客戶分佈圓餅圖
+    # ─────────────────────────────────────────────────────────────────────────
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("<div class='section-title'>客戶等級分佈</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>客戶等級分佈</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_client_grade(), use_container_width=True)
     with c2:
-        st.markdown("<div class='section-title'>客戶來源分佈</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>客戶來源分佈</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_client_source(), use_container_width=True)
-
+    
     st.markdown("---")
-    st.markdown("<div class='section-title'>客戶列表</div>", unsafe_allow_html=True)
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 客戶列表數據表
+    # ─────────────────────────────────────────────────────────────────────────
+    st.markdown(
+        "<div class='section-title'>客戶列表</div>",
+        unsafe_allow_html=True
+    )
     dcols = [c for c in ["客戶編碼","公司名稱","連絡人","客戶等級","客戶來源"] if c in df_clients.columns]
-    st.dataframe(df_clients[dcols], use_container_width=True, hide_index=True, height=400)
-
+    st.dataframe(
+        df_clients[dcols],
+        use_container_width=True,
+        hide_index=True,
+        height=400,
+    )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 條件圖表：客戶關係維護費用 (如果數據存在)
+    # ─────────────────────────────────────────────────────────────────────────
     if "費用" in df_crm.columns and df_crm["費用"].sum() > 0:
         st.markdown("---")
-        st.markdown("<div class='section-title'>客戶關係維護費用</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>客戶關係維護費用</div>",
+            unsafe_allow_html=True
+        )
         st.plotly_chart(chart_crm(), use_container_width=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE : 禮品庫存
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# 📄 PAGE 6 : 禮品庫存
+# ═════════════════════════════════════════════════════════════════════════════
 elif page == "🎁 禮品庫存":
+    """
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ 頁面：禮品庫存管理                                                      │
+    │ 佈局結構：                                                              │
+    │  ┌─────────────────────────────────────────────────────────────────────┐
+    │  │ [標題] 🎁 禮品庫存管理                                               │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [KPI 行] 禮品種類(3列)  |  已領用總數(3列)  |  剩餘總數(3列)          │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [數據表] 禮品庫存詳情 (全部列表，無高度限制)                        │
+    │  │ ─────────────────────────────────────────────────────────────────── │
+    │  │ [大圖表] 庫存使用比例 (100% 堆疊，高度 420px)                        │
+    │  └─────────────────────────────────────────────────────────────────────┘
+    │ 視覺設計：
+    │  • KPI：3 列快速指標
+    │  • 表單：禮品列表，無高度限制 (全部顯示)
+    │  • 圖表：大尺寸堆疊圖，視覺清晰
+    └─────────────────────────────────────────────────────────────────────────┘
+    """
+    
     st.markdown("## 🎁 禮品庫存管理")
     st.markdown("---")
-
-    g1, g2, g3 = st.columns(3)
-    g1.metric("禮品種類",   f"{len(df_gifts)} 種")
-    g2.metric("已領用總數", f"{int(df_gifts['已領用數量'].sum())} 件")
-    g3.metric("剩餘總數",   f"{int(df_gifts['剩餘數量'].sum())} 件")
-
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 禮品庫存 KPI 行 (3列)
+    # ─────────────────────────────────────────────────────────────────────────
+    g1, g2, g3 = st.columns(3)              # ← 3 列均分
+    g1.metric("禮品種類",   f"{len(df_gifts)} 種")  # ← 禮品種類數
+    g2.metric("已領用總數", f"{int(df_gifts['已領用數量'].sum())} 件")  # ← 已領用數量
+    g3.metric("剩餘總數",   f"{int(df_gifts['剩餘數量'].sum())} 件")   # ← 剩餘數量
+    
     st.markdown("---")
-    st.dataframe(df_gifts, use_container_width=True, hide_index=True)
-
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 禮品庫存詳細列表
+    # ─────────────────────────────────────────────────────────────────────────
+    # (無高度限制，顯示全部)
+    st.dataframe(
+        df_gifts,
+        use_container_width=True,
+        hide_index=True,
+        # ────────────────────────────────────────────────────────────────────
+        # 無 height 參數 = 自動調整高度 (全部顯示，推薦行數 < 50)
+        # 如果行數很多，可加 height=600 限制
+        # ────────────────────────────────────────────────────────────────────
+    )
+    
     st.markdown("---")
-    st.markdown("<div class='section-title'>庫存使用比例（100% 堆疊）</div>", unsafe_allow_html=True)
-    st.plotly_chart(chart_gift_stacked(420), use_container_width=True)
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # 庫存堆疊分析圖表 (獨佔一行，較大)
+    # ─────────────────────────────────────────────────────────────────────────
+    st.markdown(
+        "<div class='section-title'>庫存使用比例（100% 堆疊）</div>",
+        unsafe_allow_html=True
+    )
+    st.plotly_chart(
+        chart_gift_stacked(420),             # ← 高度 420px (較大)
+        use_container_width=True
+    )
