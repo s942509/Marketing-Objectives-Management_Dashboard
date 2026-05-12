@@ -195,7 +195,7 @@ def base_layout(height=320, legend=True):
         # ─────────────────────────────────────────────────────────────────────
         font=dict(
             color="#8899aa",                # ← 字體顏色 (灰藍色)
-            size=18,                        # ← 預設字號大小 11e改16->18
+            size=28,                        # ← 預設字號大小 11e改16->28
             family="Noto Sans TC",          # ← 字體家族
         ),
         
@@ -203,10 +203,10 @@ def base_layout(height=320, legend=True):
         # 邊距設定 (留白)
         # ─────────────────────────────────────────────────────────────────────
         margin=dict(
-            l=40,                           # ← 左邊距12->40
+            l=80,                           # ← 左邊距12->40
             r=40,                           # ← 右邊距
-            t=50,                           # ← 上邊距 (放圖例)36->50
-            b=40,                           # ← 下邊距
+            t=80,                           # ← 上邊距 (放圖例)36->50
+            b=60,                           # ← 下邊距
         ),
         
         # ─────────────────────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ def base_layout(height=320, legend=True):
         d["legend"] = dict(
             font=dict(
                 color="#aabbcc",            # ← 圖例文字顏色 (略淺)
-                size=15,                    # ← 圖例字號 (小於主字體)10改15
+                size=22,                    # ← 圖例字號 (小於主字體)10改15
             ),
             bgcolor="rgba(0,0,0,0)",        # ← 圖例背景：透明
             orientation="h",                # ← 圖例方向：水平
@@ -374,7 +374,7 @@ def chart_area_target(height=150):
             tickvals=x,
             ticktext=names,                 # ← X軸標籤：姓名
             tickangle=-40,                  # ← 旋轉-40度 (逆時針)
-            tickfont=dict(size=14)     
+            tickfont=dict(size=24)     
         ),
         # Y軸：顯示金額，帶網格
         yaxis=ax(
