@@ -187,13 +187,15 @@ def base_layout(height=320, legend=True):
         # ─────────────────────────────────────────────────────────────────────
         paper_bgcolor="rgba(0,0,0,0)",      # ← 圖表背景：透明 (不顯示邊框背景)
         plot_bgcolor="rgba(13,17,23,0.6)",  # ← 繪圖區背景：深色半透明
-        
+
+         # ⭐ 讓圖表在 fullscreen 時自動撐開
+        autosize=True,
         # ─────────────────────────────────────────────────────────────────────
         # 字體設定 (軸標籤、數值標籤等)
         # ─────────────────────────────────────────────────────────────────────
         font=dict(
             color="#8899aa",                # ← 字體顏色 (灰藍色)
-            size=16,                        # ← 預設字號大小 11e改16
+            size=18,                        # ← 預設字號大小 11e改16->18
             family="Noto Sans TC",          # ← 字體家族
         ),
         
@@ -201,10 +203,10 @@ def base_layout(height=320, legend=True):
         # 邊距設定 (留白)
         # ─────────────────────────────────────────────────────────────────────
         margin=dict(
-            l=12,                           # ← 左邊距
-            r=12,                           # ← 右邊距
-            t=36,                           # ← 上邊距 (放圖例)
-            b=12,                           # ← 下邊距
+            l=40,                           # ← 左邊距12->40
+            r=40,                           # ← 右邊距
+            t=50,                           # ← 上邊距 (放圖例)36->50
+            b=40,                           # ← 下邊距
         ),
         
         # ─────────────────────────────────────────────────────────────────────
@@ -220,7 +222,7 @@ def base_layout(height=320, legend=True):
         d["legend"] = dict(
             font=dict(
                 color="#aabbcc",            # ← 圖例文字顏色 (略淺)
-                size=14,                    # ← 圖例字號 (小於主字體)10改14
+                size=15,                    # ← 圖例字號 (小於主字體)10改15
             ),
             bgcolor="rgba(0,0,0,0)",        # ← 圖例背景：透明
             orientation="h",                # ← 圖例方向：水平
@@ -1229,14 +1231,26 @@ if page == "🏠 首頁總覽":
         # ────────────────────────────────────────────────────────────────────
         # 圖表寬度設定：use_container_width=True (充滿容器寬度)
         # ────────────────────────────────────────────────────────────────────
-        st.plotly_chart(chart_area_target(), use_container_width=True)
+        st.plotly_chart(chart_area_target(), 
+               use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )         
     
     with c2:
         st.markdown(
             "<div class='section-title'>達成率排名（基準 80%）</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_deviation(), use_container_width=True)
+        st.plotly_chart(chart_deviation(), 
+                use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )               
     
     st.markdown("---")
     
@@ -1247,14 +1261,26 @@ if page == "🏠 首頁總覽":
             "<div class='section-title'>提成金額 Top 5</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_top5(), use_container_width=True)
+        st.plotly_chart(chart_top5(), 
+                use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )               
     
     with b2:
         st.markdown(
             "<div class='section-title'>產品銷售金額分佈</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_product_pie(), use_container_width=True)
+        st.plotly_chart(chart_product_pie(),
+                use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )               
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1299,10 +1325,22 @@ elif page == "📊 全覽 Dashboard":
             "<div class='section-title'>目標 vs 實際完成</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_area_target(270), use_container_width=True)  # ← 高度 270px
+        st.plotly_chart(chart_area_target(270),   # ← 高度 270px
+                 use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )              
     with r1b:
         st.markdown("<div class='section-title'>達成率排名</div>", unsafe_allow_html=True)
-        st.plotly_chart(chart_deviation(270), use_container_width=True)
+        st.plotly_chart(chart_deviation(270),
+                use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )               
     
     # ─────────────────────────────────────────────────────────────────────────
     # 第二行：3 列圖表 (小圖，適合 3 列)
@@ -1310,19 +1348,37 @@ elif page == "📊 全覽 Dashboard":
     r2a, r2b, r2c = st.columns(3)           # ← 3 列均分
     with r2a:
         st.markdown("<div class='section-title'>提成 Top 5</div>", unsafe_allow_html=True)
-        st.plotly_chart(chart_top5(240), use_container_width=True)  # ← 高度 240px
+        st.plotly_chart(chart_top5(240),  # ← 高度 240px
+                        use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )       
     with r2b:
         st.markdown(
             "<div class='section-title'>產品銷售分佈</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_product_pie(240), use_container_width=True)
+        st.plotly_chart(chart_product_pie(240),
+                use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )               
     with r2c:
         st.markdown(
             "<div class='section-title'>客戶等級分佈</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_client_grade(240), use_container_width=True)
+        st.plotly_chart(chart_client_grade(240),
+               use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )                
     
     # ─────────────────────────────────────────────────────────────────────────
     # 第三行：2 列圖表 (中圖)
@@ -1333,13 +1389,25 @@ elif page == "📊 全覽 Dashboard":
             "<div class='section-title'>業務員銷售金額</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_sales_by_person(300), use_container_width=True)
+        st.plotly_chart(chart_sales_by_person(300),
+                  use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )             
     with r3b:
         st.markdown(
             "<div class='section-title'>禮品庫存比例</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_gift_stacked(300), use_container_width=True)
+        st.plotly_chart(chart_gift_stacked(300),
+                use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )               
     
     # ─────────────────────────────────────────────────────────────────────────
     # 銷售明細數據表
@@ -1430,13 +1498,25 @@ elif page == "🎯 目標達成分析":
             "<div class='section-title'>各季度目標分佈</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_quarterly(), use_container_width=True)
+        st.plotly_chart(chart_quarterly(),
+                 use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )              
     with t2:
         st.markdown(
             "<div class='section-title'>年度目標總覽</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_annual(), use_container_width=True)
+        st.plotly_chart(chart_annual(),
+                  use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )             
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1509,13 +1589,25 @@ elif page == "💰 銷售明細":
             "<div class='section-title'>業務員銷售金額</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_sales_by_person(), use_container_width=True)
+        st.plotly_chart(chart_sales_by_person(),
+                 use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )              
     with s2:
         st.markdown(
             "<div class='section-title'>各產品銷售數量</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_product_qty(), use_container_width=True)
+        st.plotly_chart(chart_product_qty(),
+                 use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )              
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1554,13 +1646,25 @@ elif page == "👥 客戶分析":
             "<div class='section-title'>客戶等級分佈</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_client_grade(), use_container_width=True)
+        st.plotly_chart(chart_client_grade(),
+                  use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )             
     with c2:
         st.markdown(
             "<div class='section-title'>客戶來源分佈</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_client_source(), use_container_width=True)
+        st.plotly_chart(chart_client_source(),
+                    use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )           
     
     st.markdown("---")
     
@@ -1588,7 +1692,13 @@ elif page == "👥 客戶分析":
             "<div class='section-title'>客戶關係維護費用</div>",
             unsafe_allow_html=True
         )
-        st.plotly_chart(chart_crm(), use_container_width=True)
+        st.plotly_chart(chart_crm(),
+                  use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )             
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1653,5 +1763,9 @@ elif page == "🎁 禮品庫存":
     )
     st.plotly_chart(
         chart_gift_stacked(420),             # ← 高度 420px (較大)
-        use_container_width=True
-    )
+        use_container_width=True,
+                config={
+                    "responsive": True,      # ⭐ fullscreen 自動調整
+                    "displaylogo": False     # 移除 plotly logo
+                }
+            )       
