@@ -358,6 +358,42 @@ total_achieve = df_achieve["實際完成"].sum()
 total_rate = round(total_achieve / total_target * 100, 1) if total_target else 0
 total_sales = df_sales["銷售金額"].sum()
 
+ANOMALY_NAMES = ["關羽"]
+
+df_sales_by_emp = (
+    df_sales.groupby("工號", dropna=False)["銷售金額"]
+    .sum()
+    .reset_index()
+    .rename(columns={"銷售金額": "銷售明細金額"})
+)
+
+target_cols = [
+    "工號", "第一季度目標", "第二季度目標", "第三季度目標", "第四季度目標", "年度目標"
+]
+
+df_goal = df_achieve.merge(
+    df_target[target_cols],
+    on="工號",
+    how="left",
+).merge(
+    df_sales_by_emp,
+    on="工號",
+    how="left",
+)
+
+df_goal["銷售明細金額"] = df_goal["銷售明細金額"].fillna(0)
+df_goal["目標缺口"] = df_goal["當季目標"] - df_goal["實際完成"]
+df_goal["異常"] = df_goal["姓名"].isin(ANOMALY_NAMES)
+df_goal["異常註記"] = df_goal.apply(
+    lambda r: f"分析表實際 {r['實際完成']:,.0f}$ / 銷售明細 {r['銷售明細金額']:,.0f}$"
+    if r["異常"] else "",
+    axis=1,
+)
+
+total_gap = total_target - total_achieve
+avg_rate = round(df_goal["達成率"].mean(), 1) if len(df_goal) else 0
+top_goal_person = df_goal.sort_values("達成率", ascending=False).iloc[0]["姓名"] if len(df_goal) else "-"
+
 
 def fmt(n):
     return f"{n:,.0f}$"
@@ -555,6 +591,217 @@ def chart_quarterly(height=400):
     layout = base_layout(height)
     layout["barmode"] = "group"
     layout.update(yaxis=ax(False), xaxis=ax(True))
+    fig.update_layout(**layout)
+    return fig
+
+def chart_goal_bullet(height=520):
+    df_s = df_goal.sort_values("達成率", ascending=True).copy()
+    colors = [
+        "#ff4d4f" if is_bad else (COLOR_DARK_BLUE if rate >= 80 else COLOR_BLUE)
+        for is_bad, rate in zip(df_s["異常"], df_s["達成率"])
+    ]
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        name="當季目標",
+        y=df_s["姓名"],
+        x=df_s["當季目標"],
+        orientation="h",
+        marker=dict(color="rgba(120,132,150,0.26)", line_width=0, cornerradius=8),
+        hovertemplate="<b>%{y}</b><br>當季目標: %{x:,.0f}$<extra></extra>",
+    ))
+
+    fig.add_trace(go.Bar(
+        name="實際完成",
+        y=df_s["姓名"],
+        x=df_s["實際完成"],
+        orientation="h",
+        marker=dict(color=colors, line_width=0, opacity=0.92, cornerradius=8),
+        text=[f"{v:.1f}%" for v in df_s["達成率"]],
+        textposition="outside",
+        textfont=dict(size=12, color="#d7e8ff"),
+        cliponaxis=False,
+        customdata=df_s[["當季目標", "達成率", "目標缺口", "銷售明細金額", "異常註記"]],
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            "實際完成: %{x:,.0f}$<br>"
+            "當季目標: %{customdata[0]:,.0f}$<br>"
+            "達成率: %{customdata[1]:.1f}%<br>"
+            "目標缺口: %{customdata[2]:,.0f}$<br>"
+            "銷售明細金額: %{customdata[3]:,.0f}$<br>"
+            "%{customdata[4]}"
+            "<extra></extra>"
+        ),
+    ))
+
+    layout = base_layout(height)
+    layout["barmode"] = "overlay"
+    layout.update(
+        xaxis=ax(True, title="金額"),
+        yaxis=ax(False),
+        legend=dict(
+            font=dict(color="#b8c4d2", size=15),
+            bgcolor="rgba(0,0,0,0)",
+            orientation="h",
+            yanchor="bottom",
+            y=1.03,
+            xanchor="center",
+            x=0.5,
+        ),
+        margin=dict(l=86, r=130, t=58, b=62),
+    )
+
+    fig.update_layout(**layout)
+    return fig
+
+
+def chart_quarter_heatmap(height=420):
+    quarters = ["第一季度目標", "第二季度目標", "第三季度目標", "第四季度目標"]
+    df_h = df_target.set_index("姓名")[quarters]
+
+    fig = go.Figure(data=go.Heatmap(
+        z=df_h.values,
+        x=["Q1", "Q2", "Q3", "Q4"],
+        y=df_h.index,
+        colorscale=[
+            [0, "#161b27"],
+            [0.45, COLOR_BLUE],
+            [1, COLOR_DARK_BLUE],
+        ],
+        text=[[f"{v/1000:.0f}k" for v in row] for row in df_h.values],
+        texttemplate="%{text}",
+        textfont=dict(color="#f3f6fb", size=12),
+        hovertemplate="<b>%{y}</b><br>%{x}: %{z:,.0f}$<extra></extra>",
+        showscale=False,
+    ))
+
+    layout = base_layout(height, legend=False)
+    layout.update(
+        xaxis=ax(False, title="季度"),
+        yaxis=ax(False),
+        margin=dict(l=86, r=40, t=44, b=54),
+    )
+    fig.update_layout(**layout)
+    return fig
+
+
+def chart_goal_scatter(height=420):
+    df_s = df_goal.copy()
+    sizes = df_s["銷售明細金額"].clip(lower=1)
+    marker_colors = ["#ff4d4f" if v else COLOR_BLUE for v in df_s["異常"]]
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=df_s["達成率"],
+        y=df_s["年度目標"],
+        mode="markers+text",
+        text=df_s["姓名"],
+        textposition="top center",
+        marker=dict(
+            size=(sizes / sizes.max() * 34 + 10) if sizes.max() else 16,
+            color=marker_colors,
+            line=dict(color="#0d1117", width=1.5),
+            opacity=0.9,
+        ),
+        customdata=df_s[["當季目標", "實際完成", "銷售明細金額", "異常註記"]],
+        hovertemplate=(
+            "<b>%{text}</b><br>"
+            "達成率: %{x:.1f}%<br>"
+            "年度目標: %{y:,.0f}$<br>"
+            "當季目標: %{customdata[0]:,.0f}$<br>"
+            "實際完成: %{customdata[1]:,.0f}$<br>"
+            "銷售明細金額: %{customdata[2]:,.0f}$<br>"
+            "%{customdata[3]}"
+            "<extra></extra>"
+        ),
+    ))
+
+    fig.add_vline(
+        x=80,
+        line_width=1.4,
+        line_dash="dash",
+        line_color="#8899aa",
+        annotation_text="80% 基準",
+        annotation_font_color="#8899aa",
+    )
+
+    layout = base_layout(height, legend=False)
+    layout.update(
+        xaxis=ax(True, title="達成率 %", ticksuffix="%"),
+        yaxis=ax(True, title="年度目標"),
+        margin=dict(l=86, r=64, t=48, b=62),
+    )
+    fig.update_layout(**layout)
+    return fig
+
+
+def chart_product_treemap(height=360):
+    df_p = (
+        df_sales.groupby("產品名稱", dropna=False)["銷售金額"]
+        .sum()
+        .reset_index()
+        .sort_values("銷售金額", ascending=False)
+    )
+
+    fig = px.treemap(
+        df_p,
+        path=["產品名稱"],
+        values="銷售金額",
+        color="銷售金額",
+        color_continuous_scale=[COLOR_BLUE, COLOR_DARK_BLUE],
+    )
+
+    fig.update_traces(
+        texttemplate="<b>%{label}</b><br>%{value:,.0f}$",
+        textfont=dict(size=16, color="#f3f6fb"),
+        marker=dict(line=dict(color="#0d1117", width=2)),
+        hovertemplate="<b>%{label}</b><br>銷售金額: %{value:,.0f}$<extra></extra>",
+    )
+
+    layout = base_layout(height, legend=False)
+    layout["coloraxis_showscale"] = False
+    layout.update(margin=dict(l=8, r=8, t=28, b=8))
+    fig.update_layout(**layout)
+    return fig
+
+
+def chart_crm_source_level(height=360):
+    if not {"客戶等級", "客戶來源", "費用"}.issubset(df_crm.columns):
+        return chart_crm(height)
+
+    df_c = (
+        df_crm.groupby(["客戶來源", "客戶等級"], dropna=False)["費用"]
+        .sum()
+        .reset_index()
+    )
+
+    fig = px.bar(
+        df_c,
+        x="費用",
+        y="客戶來源",
+        color="客戶等級",
+        orientation="h",
+        color_discrete_sequence=PALETTE,
+        text="費用",
+    )
+
+    fig.update_traces(
+        texttemplate="%{text:,.0f}$",
+        textposition="inside",
+        textfont=dict(size=12, color="#f3f6fb"),
+        marker=dict(line_width=0, opacity=0.9, cornerradius=6),
+        cliponaxis=False,
+    )
+
+    layout = base_layout(height)
+    layout["barmode"] = "stack"
+    layout.update(
+        xaxis=ax(True, title="維護費用"),
+        yaxis=ax(False, title="客戶來源"),
+        margin=dict(l=86, r=48, t=58, b=58),
+    )
     fig.update_layout(**layout)
     return fig
 
@@ -851,23 +1098,95 @@ elif page == "📊 全覽 Dashboard":
 
 elif page == "🎯 目標達成分析":
     st.markdown("<div class='main-title'>業務員目標達成分析</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='page-subtitle'>整合當季目標、實際完成、年度目標、銷售明細與客戶維護投入</div>",
+        unsafe_allow_html=True,
+    )
 
-    df_show = df_achieve[["姓名", "當季目標", "實際完成", "達成率", "提出金額", "排名"]].copy()
-    df_show["當季目標"] = df_show["當季目標"].apply(fmt)
-    df_show["實際完成"] = df_show["實際完成"].apply(fmt)
-    df_show["提出金額"] = df_show["提出金額"].apply(fmt)
-    df_show["達成率"] = df_show["達成率"].apply(lambda x: f"{x}%")
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("當季總目標", fmt(total_target))
+    k2.metric("當季實際完成", fmt(total_achieve))
+    k3.metric("整體達成率", f"{total_rate}%", delta=f"目標 80%")
+    k4.metric("目標缺口", fmt(total_gap))
+    k5.metric("最佳達成人員", top_goal_person)
 
-    st.dataframe(df_show, use_container_width=True, hide_index=True, height=460)
+    if df_goal["異常"].any():
+        anomaly_text = "；".join(
+            df_goal.loc[df_goal["異常"], ["姓名", "異常註記"]]
+            .apply(lambda r: f"{r['姓名']}：{r['異常註記']}", axis=1)
+            .tolist()
+        )
+        st.markdown(
+            f"""
+            <div style="
+                margin-top:0.8rem;
+                padding:0.75rem 1rem;
+                border:1px solid rgba(255,77,79,0.55);
+                background:rgba(255,77,79,0.12);
+                color:#ffd1d1;
+                border-radius:8px;
+                font-size:clamp(12px,0.82vw,15px);
+            ">
+                資料異常提示：{anomaly_text}。圖中以紅色標示。
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     st.markdown("---")
 
-    t1, t2 = st.columns(2)
-    with t1:
-        st.markdown("<div class='section-title'>各季度目標分佈</div>", unsafe_allow_html=True)
-        show_chart(chart_quarterly())
-    with t2:
-        st.markdown("<div class='section-title'>年度目標總覽</div>", unsafe_allow_html=True)
-        show_chart(chart_annual())
+    r1a, r1b = st.columns([1.18, 0.82])
+    with r1a:
+        st.markdown("<div class='section-title'>業務員目標達成 Bullet Chart</div>", unsafe_allow_html=True)
+        show_chart(chart_goal_bullet(540))
+
+    with r1b:
+        st.markdown("<div class='section-title'>年度目標 vs 達成率</div>", unsafe_allow_html=True)
+        show_chart(chart_goal_scatter(540))
+
+    r2a, r2b = st.columns([1.05, 0.95])
+    with r2a:
+        st.markdown("<div class='section-title'>季度目標壓力熱力圖</div>", unsafe_allow_html=True)
+        show_chart(chart_quarter_heatmap(420))
+
+    with r2b:
+        st.markdown("<div class='section-title'>產品銷售貢獻</div>", unsafe_allow_html=True)
+        show_chart(chart_product_treemap(420))
+
+    r3a, r3b = st.columns([1.05, 0.95])
+    with r3a:
+        st.markdown("<div class='section-title'>客戶來源 × 等級 × 維護費用</div>", unsafe_allow_html=True)
+        show_chart(chart_crm_source_level(360))
+
+    with r3b:
+        st.markdown("<div class='section-title'>目標達成資料表</div>", unsafe_allow_html=True)
+
+        df_show = df_goal[[
+            "姓名", "當季目標", "實際完成", "銷售明細金額", "達成率",
+            "目標缺口", "提出金額", "排名", "異常註記", "異常"
+        ]].copy()
+
+        for c in ["當季目標", "實際完成", "銷售明細金額", "目標缺口", "提出金額"]:
+            df_show[c] = df_show[c].apply(fmt)
+
+        df_show["達成率"] = df_show["達成率"].apply(lambda x: f"{x}%")
+        df_show = df_show.drop(columns=["異常"])
+
+        def highlight_anomaly(row):
+            is_bad = row["異常註記"] != ""
+            return [
+                "background-color: rgba(255,77,79,0.18); color: #ffd1d1;"
+                if is_bad else ""
+                for _ in row
+            ]
+
+        st.dataframe(
+            df_show.style.apply(highlight_anomaly, axis=1),
+            use_container_width=True,
+            hide_index=True,
+            height=360,
+        )
+
 
 
 elif page == "💰 銷售明細":
