@@ -3,6 +3,8 @@ import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+import json
+from openai import OpenAI
 
 st.set_page_config(
     page_title="營銷目標管理 Dashboard",
@@ -10,6 +12,18 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+@st.cache_resource
+def get_openai_client():
+    if "OPENAI_API_KEY" not in st.secrets:
+        return None
+
+    return OpenAI(
+        api_key=st.secrets["OPENAI_API_KEY"]
+    )
+
+
+openai_client = get_openai_client()
 
 st.markdown("""
 <style>
@@ -1009,6 +1023,7 @@ with st.sidebar:
             "💰 銷售明細",
             "👥 客戶分析",
             "🎁 禮品庫存",
+            "🤖 AI 智慧分析",
         ],
         label_visibility="collapsed",
     )
@@ -1264,3 +1279,64 @@ elif page == "🎁 禮品庫存":
     st.markdown("---")
     st.markdown("<div class='section-title'>庫存使用比例（100% 堆疊）</div>", unsafe_allow_html=True)
     show_chart(chart_gift_stacked(420))
+
+elif page == "🤖 AI 智慧分析":
+    st.markdown(
+        "<div class='main-title'>AI 智慧分析</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<div class='page-subtitle'>"
+        "使用自然語言查詢目前儀表板資料"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    if openai_client is None:
+        st.error("尚未設定 OPENAI_API_KEY。")
+        st.stop()
+
+    if "ai_messages" not in st.session_state:
+        st.session_state.ai_messages = []
+
+    for message in st.session_state.ai_messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    question = st.chat_input(
+        "例如：我想知道客戶的年齡層分析"
+    )
+
+    if question:
+        st.session_state.ai_messages.append({
+            "role": "user",
+            "content": question,
+        })
+
+        with st.chat_message("user"):
+            st.markdown(question)
+
+        with st.chat_message("assistant"):
+            with st.spinner("正在分析……"):
+                try:
+                    response = openai_client.responses.create(
+                        model="gpt-5.6-luna",
+                        instructions=(
+                            "你是繁體中文資料分析助理。"
+                            "目前僅進行連線測試。"
+                            "如果使用者詢問的資料不存在，"
+                            "請回答：此問題不在目前資料範圍內。"
+                        ),
+                        input=question,
+                    )
+
+                    answer = response.output_text
+                    st.markdown(answer)
+
+                    st.session_state.ai_messages.append({
+                        "role": "assistant",
+                        "content": answer,
+                    })
+
+                except Exception as e:
+                    st.error("OpenAI API 連線失敗，請檢查金鑰及API額度。")
