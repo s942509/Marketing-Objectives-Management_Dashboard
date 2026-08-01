@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import json
+import re
 from openai import OpenAI
 
 st.set_page_config(
@@ -998,6 +999,398 @@ def chart_crm(height=300):
     return fig
 
 
+# ─────────────────────────────────────────────────────────────
+# AI 智慧分析：資料字典、查詢規劃與安全分析執行器
+# AI 只選擇預先允許的分析，不會產生或執行任意 Python 程式。
+# 原始姓名、電話、公司與生日不會傳送給 OpenAI。
+# ─────────────────────────────────────────────────────────────
+
+AI_ANALYSIS_CATALOG = {
+    "client_age_distribution": {
+        "name": "客戶年齡層分析",
+        "description": "依客戶資訊的生日計算目前年齡，統計各年齡層人數與占比",
+        "examples": ["客戶年齡層分析", "客戶主要幾歲", "不同年齡的客戶有多少"],
+    },
+    "client_grade_distribution": {
+        "name": "客戶等級分布",
+        "description": "統計各客戶等級的人數與占比",
+        "examples": ["客戶等級分布", "重點客戶有多少", "哪種客戶等級最多"],
+    },
+    "client_source_distribution": {
+        "name": "客戶來源分布",
+        "description": "統計各客戶來源的人數與占比",
+        "examples": ["客戶從哪裡來", "客戶來源分析", "哪個來源的客戶最多"],
+    },
+    "sales_by_product_amount": {
+        "name": "產品銷售額分析",
+        "description": "依產品名稱加總銷售金額並排名",
+        "examples": ["哪種產品銷售額最高", "產品營收排行", "各產品銷售金額"],
+    },
+    "sales_by_product_quantity": {
+        "name": "產品銷售數量分析",
+        "description": "依產品名稱加總銷售數量並排名",
+        "examples": ["哪個產品賣最多", "產品銷售數量", "產品數量排行"],
+    },
+    "sales_by_employee": {
+        "name": "業務員銷售額分析",
+        "description": "依業務員加總銷售明細金額並排名",
+        "examples": ["哪位業務員銷售最好", "業務員銷售排行", "各業務員銷售額"],
+    },
+    "sales_trend": {
+        "name": "銷售趨勢分析",
+        "description": "依銷售日期加總銷售金額並呈現時間趨勢",
+        "examples": ["銷售趨勢", "每天的銷售額", "銷售金額隨時間如何變化"],
+    },
+    "goal_achievement": {
+        "name": "業務員目標達成分析",
+        "description": "比較各業務員當季目標、實際完成與達成率",
+        "examples": ["誰的達成率最高", "業務目標達成情況", "哪些業務沒有達標"],
+    },
+    "gift_inventory": {
+        "name": "禮品庫存分析",
+        "description": "比較各禮品的已領用數量與剩餘數量",
+        "examples": ["禮品還剩多少", "禮品庫存分析", "哪個禮品庫存最少"],
+    },
+    "crm_maintenance_type": {
+        "name": "CRM 維護方式分析",
+        "description": "依維護內容統計次數與費用",
+        "examples": ["客戶通常怎麼維護", "CRM 維護方式", "哪種維護活動最多"],
+    },
+    "crm_cost_by_maintainer": {
+        "name": "CRM 維護人費用分析",
+        "description": "依維護人加總客戶維護費用",
+        "examples": ["各維護人的費用", "誰的客戶維護費最高", "CRM 費用排行"],
+    },
+}
+
+AI_DATA_SCOPE = {
+    "客戶資訊": ["生日（僅在本機計算年齡）", "客戶等級", "客戶來源"],
+    "銷售明細": ["銷售日期", "業務員", "產品名稱", "數量", "銷售單價", "銷售金額"],
+    "目標完成": ["姓名", "當季目標", "實際完成", "達成率"],
+    "禮品庫存": ["禮品名稱", "數量", "已領用數量", "剩餘數量"],
+    "CRM 維護": ["客戶等級", "客戶來源", "維護內容", "維護時間", "費用", "維護人"],
+}
+
+SUPPORTED_QUESTION_EXAMPLES = [
+    "我想知道客戶的年齡層分析",
+    "哪一種產品的銷售額最高？",
+    "各業務員的目標達成率如何？",
+    "目前哪一種禮品的剩餘庫存最少？",
+    "最常使用的客戶維護方式是什麼？",
+]
+
+
+def guided_out_of_scope(question, reason=None):
+    """說明無法回答的原因，並引導使用者回到目前可查詢的資料。"""
+    q = question.lower().replace(" ", "")
+
+    if any(word in q for word in ["性別", "男女", "男性", "女性"]):
+        problem = "目前資料沒有「性別」欄位，因此無法進行男女或性別分布分析。"
+        suggestions = ["我想知道客戶的年齡層分析", "各客戶等級的人數與占比", "客戶來源分布"]
+    elif any(word in q for word in ["地區", "縣市", "城市", "地址", "區域"]):
+        problem = "目前資料沒有可供分析的客戶地址、縣市或地區欄位，因此無法進行區域分析。"
+        suggestions = ["客戶來源分布", "客戶等級分布", "哪一種產品的銷售額最高？"]
+    elif any(word in q for word in ["利潤", "毛利", "成本", "淨利"]):
+        problem = "目前只有銷售金額與銷售單價，沒有產品成本或費用歸屬資料，因此無法正確計算利潤或毛利。"
+        suggestions = ["各產品銷售金額排行", "各產品銷售數量排行", "銷售金額趨勢"]
+    elif any(word in q for word in ["預測", "明年", "未來", "趨勢預估"]):
+        problem = "目前展示版只提供既有資料的描述性分析，尚未建立預測模型，因此不能提供未來業績或需求預測。"
+        suggestions = ["目前銷售金額趨勢", "各業務員目標達成率", "產品銷售額排行"]
+    elif any(word in q for word in ["電話", "生日明細", "客戶名單", "公司名單", "聯絡人"]):
+        problem = "這個問題可能涉及逐筆客戶個資；目前 Chatbot 只提供彙總分析，不提供姓名、公司、電話或完整生日明細。"
+        suggestions = ["客戶年齡層分布", "客戶等級分布", "客戶來源分布"]
+    elif (any(word in q for word in ["年齡", "歲數", "幾歲"]) and any(word in q for word in ["產品", "購買", "消費", "銷售"])):
+        problem = "這需要把客戶生日與銷售資料跨表關聯；目前測試資料的客戶對應不一致，因此展示版不執行這項分析，以免產生錯誤結果。"
+        suggestions = ["客戶年齡層分布", "產品銷售額排行", "客戶來源分布"]
+    else:
+        problem = reason or "目前資料沒有回答這個問題所需要的欄位或分析規則。"
+        suggestions = SUPPORTED_QUESTION_EXAMPLES[:3]
+
+    examples = "\n".join(f"- {item}" for item in suggestions)
+    return f"{problem}\n\n你可以改問目前資料能回答的問題，例如：\n{examples}"
+
+
+def safe_json_object(text):
+    """從模型文字中擷取單一 JSON 物件。"""
+    cleaned = text.strip()
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+        if not match:
+            raise ValueError("AI 未回傳有效的分析計畫")
+        return json.loads(match.group(0))
+
+
+def local_analysis_fallback(question):
+    """模型格式異常時，只對明確且安全的常見問題提供備援路由。"""
+    q = question.lower().replace(" ", "")
+    rules = [
+        (["年齡", "歲數", "幾歲"], "client_age_distribution"),
+        (["客戶等級", "重點客戶", "一般客戶", "老客戶", "新客戶"], "client_grade_distribution"),
+        (["客戶來源", "客源", "從哪裡來"], "client_source_distribution"),
+        (["達成率", "達標", "目標完成"], "goal_achievement"),
+        (["禮品", "贈品", "庫存"], "gift_inventory"),
+        (["維護人", "維護費"], "crm_cost_by_maintainer"),
+        (["維護方式", "維護內容", "客戶維護"], "crm_maintenance_type"),
+        (["銷售趨勢", "每日銷售", "時間趨勢"], "sales_trend"),
+    ]
+    for keywords, analysis_id in rules:
+        if any(keyword in q for keyword in keywords):
+            return {
+                "status": "ready",
+                "analysis_id": analysis_id,
+                "title": AI_ANALYSIS_CATALOG[analysis_id]["name"],
+            }
+
+    if ("產品" in q or "商品" in q) and any(k in q for k in ["數量", "賣最多", "銷量"]):
+        return {"status": "ready", "analysis_id": "sales_by_product_quantity", "title": "產品銷售數量分析"}
+    if "產品" in q or "商品" in q:
+        return {"status": "ready", "analysis_id": "sales_by_product_amount", "title": "產品銷售額分析"}
+    if "業務" in q and any(k in q for k in ["銷售", "業績", "營收"]):
+        return {"status": "ready", "analysis_id": "sales_by_employee", "title": "業務員銷售額分析"}
+
+    return {
+        "status": "out_of_scope",
+        "analysis_id": None,
+        "message": guided_out_of_scope(question),
+    }
+
+
+def create_analysis_plan(question):
+    catalog_text = json.dumps(AI_ANALYSIS_CATALOG, ensure_ascii=False)
+    scope_text = json.dumps(AI_DATA_SCOPE, ensure_ascii=False)
+    instructions = f"""
+你是繁體中文商業資料查詢規劃器。你的工作只有判斷使用者問題是否能用目前資料回答，
+並選擇一個允許的 analysis_id；不要計算、不要猜測數字、不要要求或輸出個資。
+
+可用分析：{catalog_text}
+目前資料範圍：{scope_text}
+
+規則：
+1. 只能選擇上面列出的 analysis_id，不得創造新的分析或欄位。
+2. 若資料範圍沒有回答問題所需的欄位，status 必須是 out_of_scope；message 要明確指出缺少哪個欄位或哪項分析能力。
+3. 若問題有兩種以上合理解讀且無法判斷，status 必須是 need_clarification；message 要提出一個簡短問題，並列出 2 至 3 個可選方向。
+4. 不得讓使用者取得姓名、公司、電話、完整生日或逐筆客戶資料。
+5. 跨表分析目前不開放；例如年齡層與產品偏好應回傳 out_of_scope，並建議分別詢問年齡層分布或產品銷售排行。
+6. out_of_scope 的 message 不可只寫「不在範圍」；必須說明錯在哪，並提供 2 至 3 個目前資料可回答的替代問法。
+7. 只輸出 JSON，不要 Markdown 或其他文字。
+
+輸出格式：
+{{"status":"ready|out_of_scope|need_clarification","analysis_id":"允許的ID或null","title":"簡短中文標題","message":"拒答或澄清訊息，ready時留空"}}
+"""
+    response = openai_client.responses.create(
+        model="gpt-5.6-luna",
+        instructions=instructions,
+        input=question,
+    )
+    plan = safe_json_object(response.output_text)
+    status = plan.get("status")
+    analysis_id = plan.get("analysis_id")
+
+    if status not in {"ready", "out_of_scope", "need_clarification"}:
+        raise ValueError("AI 回傳了未知狀態")
+    if status == "ready" and analysis_id not in AI_ANALYSIS_CATALOG:
+        raise ValueError("AI 選擇了不允許的分析")
+    return plan
+
+
+def percent_table(series, category_name):
+    result = series.fillna("未填寫").astype(str).value_counts().rename_axis(category_name).reset_index(name="人數")
+    total = result["人數"].sum()
+    result["占比"] = (result["人數"] / total * 100).round(1) if total else 0
+    return result
+
+
+def ai_bar_chart(df, category, value, title, value_suffix=""):
+    plot_df = df.sort_values(value, ascending=True)
+    fig = px.bar(
+        plot_df,
+        x=value,
+        y=category,
+        orientation="h",
+        color=value,
+        color_continuous_scale=[COLOR_BLUE, COLOR_DARK_BLUE],
+        text=value,
+    )
+    fig.update_traces(
+        texttemplate=f"%{{text:,.0f}}{value_suffix}",
+        textposition="outside",
+        marker=dict(line_width=0, opacity=0.9, cornerradius=8),
+        cliponaxis=False,
+    )
+    layout = base_layout(max(340, 54 * len(plot_df)), legend=False)
+    layout["coloraxis_showscale"] = False
+    layout.update(
+        title=dict(text=title, font=dict(color="#f3f6fb", size=20)),
+        xaxis=ax(True, title=value),
+        yaxis=ax(False, title=None),
+        margin=dict(l=96, r=110, t=68, b=58),
+    )
+    fig.update_layout(**layout)
+    return fig
+
+
+def execute_ai_analysis(analysis_id):
+    """執行白名單分析，回傳文字、彙總表與圖表。"""
+    if analysis_id == "client_age_distribution":
+        birthdays = pd.to_datetime(df_clients["生日"], errors="coerce")
+        today = pd.Timestamp.today().normalize()
+        ages = today.year - birthdays.dt.year - (
+            (today.month < birthdays.dt.month)
+            | ((today.month == birthdays.dt.month) & (today.day < birthdays.dt.day))
+        ).astype("Int64")
+        valid_ages = ages.where((ages >= 0) & (ages <= 120))
+        groups = pd.cut(
+            valid_ages,
+            bins=[-1, 20, 30, 40, 50, 60, 120],
+            labels=["20歲以下", "21–30歲", "31–40歲", "41–50歲", "51–60歲", "61歲以上"],
+        )
+        result = groups.value_counts(sort=False).rename_axis("年齡層").reset_index(name="客戶數")
+        result = result[result["客戶數"] > 0]
+        total = int(result["客戶數"].sum())
+        result["占比"] = (result["客戶數"] / total * 100).round(1) if total else 0
+        if result.empty:
+            raise ValueError("生日欄位沒有可用的日期資料")
+        top = result.loc[result["客戶數"].idxmax()]
+        answer = f"共有 {total:,} 位客戶具有有效生日資料；人數最多的是 {top['年齡層']}，共 {int(top['客戶數']):,} 人，占 {top['占比']:.1f}%。"
+        fig = ai_bar_chart(result, "年齡層", "客戶數", "客戶年齡層分布")
+        return answer, result, fig, "客戶資訊｜生日（僅於程式端計算）"
+
+    if analysis_id == "client_grade_distribution":
+        result = percent_table(df_clients["客戶等級"], "客戶等級")
+        top = result.iloc[0]
+        answer = f"目前共有 {int(result['人數'].sum()):,} 位客戶；{top['客戶等級']}最多，共 {int(top['人數']):,} 人，占 {top['占比']:.1f}%。"
+        fig = ai_bar_chart(result, "客戶等級", "人數", "客戶等級分布")
+        return answer, result, fig, "客戶資訊｜客戶等級"
+
+    if analysis_id == "client_source_distribution":
+        result = percent_table(df_clients["客戶來源"], "客戶來源")
+        top = result.iloc[0]
+        answer = f"主要客戶來源是 {top['客戶來源']}，共有 {int(top['人數']):,} 位，占 {top['占比']:.1f}%。"
+        fig = ai_bar_chart(result, "客戶來源", "人數", "客戶來源分布")
+        return answer, result, fig, "客戶資訊｜客戶來源"
+
+    if analysis_id == "sales_by_product_amount":
+        result = df_sales.groupby("產品名稱", dropna=False)["銷售金額"].sum().reset_index().sort_values("銷售金額", ascending=False)
+        top = result.iloc[0]
+        answer = f"銷售額最高的產品是 {top['產品名稱']}，銷售額為 {top['銷售金額']:,.0f}$；全部產品合計 {result['銷售金額'].sum():,.0f}$。"
+        fig = ai_bar_chart(result, "產品名稱", "銷售金額", "產品銷售額排行", "$")
+        return answer, result, fig, "銷售明細｜產品名稱、銷售金額"
+
+    if analysis_id == "sales_by_product_quantity":
+        result = df_sales.groupby("產品名稱", dropna=False)["數量"].sum().reset_index().sort_values("數量", ascending=False)
+        top = result.iloc[0]
+        answer = f"銷售數量最多的產品是 {top['產品名稱']}，共 {top['數量']:,.0f} 個／台／套（依原始單位）。"
+        fig = ai_bar_chart(result, "產品名稱", "數量", "產品銷售數量排行")
+        return answer, result, fig, "銷售明細｜產品名稱、數量"
+
+    if analysis_id == "sales_by_employee":
+        result = df_sales.groupby("業務員", dropna=False)["銷售金額"].sum().reset_index().sort_values("銷售金額", ascending=False)
+        top = result.iloc[0]
+        answer = f"依銷售明細計算，銷售額最高的業務員是 {top['業務員']}，金額為 {top['銷售金額']:,.0f}$。"
+        fig = ai_bar_chart(result, "業務員", "銷售金額", "業務員銷售額排行", "$")
+        return answer, result, fig, "銷售明細｜業務員、銷售金額"
+
+    if analysis_id == "sales_trend":
+        work = df_sales[["銷售日期", "銷售金額"]].copy()
+        work["銷售日期"] = pd.to_datetime(work["銷售日期"], errors="coerce")
+        work = work.dropna(subset=["銷售日期"])
+        result = work.groupby("銷售日期", as_index=False)["銷售金額"].sum().sort_values("銷售日期")
+        if result.empty:
+            raise ValueError("銷售日期欄位沒有可用的日期資料")
+        top = result.loc[result["銷售金額"].idxmax()]
+        answer = f"銷售金額最高的日期是 {top['銷售日期']:%Y-%m-%d}，當日銷售額為 {top['銷售金額']:,.0f}$。"
+        fig = px.line(result, x="銷售日期", y="銷售金額", markers=True)
+        layout = base_layout(390, legend=False)
+        layout.update(title=dict(text="銷售金額趨勢", font=dict(color="#f3f6fb", size=20)), xaxis=ax(True), yaxis=ax(True, title="銷售金額"))
+        fig.update_traces(line=dict(color=COLOR_DARK_BLUE, width=3), marker=dict(color=COLOR_PINK, size=8))
+        fig.update_layout(**layout)
+        return answer, result, fig, "銷售明細｜銷售日期、銷售金額"
+
+    if analysis_id == "goal_achievement":
+        result = df_achieve[["姓名", "當季目標", "實際完成", "達成率"]].copy().sort_values("達成率", ascending=False)
+        top = result.iloc[0]
+        reached = int((result["達成率"] >= 100).sum())
+        answer = f"達成率最高的是 {top['姓名']}，達成率 {top['達成率']:.1f}%；目前共有 {reached} 位業務員達到或超過 100%。"
+        plot_df = result.sort_values("達成率")
+        fig = px.bar(plot_df, x="達成率", y="姓名", orientation="h", text="達成率", color="達成率", color_continuous_scale=[COLOR_DEEP_PINK, COLOR_BLUE, COLOR_DARK_BLUE])
+        fig.update_traces(texttemplate="%{text:.1f}%", textposition="outside", marker=dict(cornerradius=8), cliponaxis=False)
+        fig.add_vline(x=100, line_dash="dash", line_color="#ffab91", annotation_text="100%")
+        layout = base_layout(max(420, 48 * len(plot_df)), legend=False)
+        layout["coloraxis_showscale"] = False
+        layout.update(title=dict(text="業務員目標達成率", font=dict(color="#f3f6fb", size=20)), xaxis=ax(True, title="達成率 %"), yaxis=ax(False))
+        fig.update_layout(**layout)
+        return answer, result, fig, "業務員目標完成分析表｜當季目標、實際完成、達成率"
+
+    if analysis_id == "gift_inventory":
+        result = df_gifts[["禮品名稱", "數量", "已領用數量", "剩餘數量"]].copy().sort_values("剩餘數量")
+        low = result.iloc[0]
+        answer = f"目前剩餘庫存最少的是 {low['禮品名稱']}，剩餘 {low['剩餘數量']:,.0f}；全部禮品剩餘 {result['剩餘數量'].sum():,.0f}。"
+        fig = go.Figure()
+        fig.add_bar(name="已領用", y=result["禮品名稱"], x=result["已領用數量"], orientation="h", marker_color=COLOR_PINK)
+        fig.add_bar(name="剩餘", y=result["禮品名稱"], x=result["剩餘數量"], orientation="h", marker_color=COLOR_DARK_BLUE)
+        layout = base_layout(max(340, 58 * len(result)))
+        layout["barmode"] = "stack"
+        layout.update(title=dict(text="禮品領用與剩餘庫存", font=dict(color="#f3f6fb", size=20)), xaxis=ax(True, title="數量"), yaxis=ax(False))
+        fig.update_layout(**layout)
+        return answer, result, fig, "禮品庫存表｜禮品名稱、數量、已領用數量、剩餘數量"
+
+    if analysis_id == "crm_maintenance_type":
+        result = df_crm.groupby("維護內容", dropna=False).agg(次數=("維護內容", "size"), 費用=("費用", "sum")).reset_index().sort_values("次數", ascending=False)
+        top = result.iloc[0]
+        answer = f"最常使用的客戶維護方式是 {top['維護內容']}，共 {int(top['次數'])} 次；相關費用合計 {top['費用']:,.0f}$。"
+        fig = ai_bar_chart(result, "維護內容", "次數", "CRM 維護方式次數")
+        return answer, result, fig, "客戶關係維護表｜維護內容、費用"
+
+    if analysis_id == "crm_cost_by_maintainer":
+        result = df_crm.groupby("維護人", dropna=False)["費用"].sum().reset_index().sort_values("費用", ascending=False)
+        top = result.iloc[0]
+        answer = f"維護費用最高的維護人是 {top['維護人']}，費用合計 {top['費用']:,.0f}$。"
+        fig = ai_bar_chart(result, "維護人", "費用", "CRM 維護人費用排行", "$")
+        return answer, result, fig, "客戶關係維護表｜維護人、費用"
+
+    raise ValueError("尚未實作此分析")
+
+
+def run_ai_question(question):
+    try:
+        plan = create_analysis_plan(question)
+    except Exception:
+        plan = local_analysis_fallback(question)
+
+    if plan.get("status") != "ready":
+        if plan.get("status") == "need_clarification":
+            message = plan.get("message") or "請再說明您想分析客戶、產品、業務員、禮品或 CRM 哪一個方向。"
+            message += "\n\n目前可查詢：客戶年齡／等級／來源、產品與業務銷售、目標達成率、禮品庫存及 CRM 維護。"
+        else:
+            raw_reason = plan.get("message")
+            if raw_reason and "你可以改問" in raw_reason:
+                message = raw_reason
+            else:
+                message = guided_out_of_scope(question, raw_reason)
+        return {"content": message, "plan": plan, "table": None, "fig": None, "source": None}
+
+    try:
+        answer, result, fig, source = execute_ai_analysis(plan["analysis_id"])
+        return {
+            "content": answer,
+            "plan": plan,
+            "table": result,
+            "fig": fig,
+            "source": source,
+        }
+    except Exception as exc:
+        return {
+            "content": f"目前資料無法完成這項分析：{exc}",
+            "plan": plan,
+            "table": None,
+            "fig": None,
+            "source": None,
+        }
+
+
 def show_chart(fig):
     st.plotly_chart(fig, use_container_width=True, config=PLOT_CONFIG)
 
@@ -1287,7 +1680,7 @@ elif page == "🤖 AI 智慧分析":
     )
     st.markdown(
         "<div class='page-subtitle'>"
-        "使用自然語言查詢目前儀表板資料"
+        "使用自然語言查詢目前儀表板資料；分析數字由 Pandas 計算，AI 不直接接觸客戶個資。"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -1296,12 +1689,42 @@ elif page == "🤖 AI 智慧分析":
         st.error("尚未設定 OPENAI_API_KEY。")
         st.stop()
 
+    with st.expander("目前可以詢問哪些問題？", expanded=False):
+        st.markdown(
+            """
+- 客戶年齡層、客戶等級、客戶來源
+- 產品銷售額、產品銷售數量、業務員銷售額
+- 銷售日期趨勢、業務員目標達成率
+- 禮品庫存、CRM 維護方式及維護費用
+
+如果問題需要目前沒有的欄位，或需要不可靠的跨表關聯，系統會回答「此問題不在目前資料範圍內」。
+            """
+        )
+
     if "ai_messages" not in st.session_state:
-        st.session_state.ai_messages = []
+        st.session_state.ai_messages = [{
+            "role": "assistant",
+            "content": "您好，我可以協助分析目前儀表板中的客戶、銷售、目標、禮品與 CRM 資料。您可以問我：『我想知道客戶的年齡層分析』。",
+            "table": None,
+            "fig": None,
+            "source": None,
+        }]
 
     for message in st.session_state.ai_messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            if message.get("fig") is not None:
+                show_chart(message["fig"])
+            if message.get("table") is not None:
+                st.dataframe(message["table"], use_container_width=True, hide_index=True)
+            if message.get("source"):
+                st.caption(f"資料來源：{message['source']}")
+
+    clear_col, _ = st.columns([1, 5])
+    with clear_col:
+        if st.button("🗑️ 清除對話", key="clear_ai_chat"):
+            st.session_state.ai_messages = []
+            st.rerun()
 
     question = st.chat_input(
         "例如：我想知道客戶的年齡層分析"
@@ -1319,24 +1742,22 @@ elif page == "🤖 AI 智慧分析":
         with st.chat_message("assistant"):
             with st.spinner("正在分析……"):
                 try:
-                    response = openai_client.responses.create(
-                        model="gpt-5.6-luna",
-                        instructions=(
-                            "你是繁體中文資料分析助理。"
-                            "目前僅進行連線測試。"
-                            "如果使用者詢問的資料不存在，"
-                            "請回答：此問題不在目前資料範圍內。"
-                        ),
-                        input=question,
-                    )
-
-                    answer = response.output_text
-                    st.markdown(answer)
+                    result = run_ai_question(question)
+                    st.markdown(result["content"])
+                    if result.get("fig") is not None:
+                        show_chart(result["fig"])
+                    if result.get("table") is not None:
+                        st.dataframe(result["table"], use_container_width=True, hide_index=True)
+                    if result.get("source"):
+                        st.caption(f"資料來源：{result['source']}")
 
                     st.session_state.ai_messages.append({
                         "role": "assistant",
-                        "content": answer,
+                        "content": result["content"],
+                        "table": result.get("table"),
+                        "fig": result.get("fig"),
+                        "source": result.get("source"),
                     })
 
-                except Exception as e:
-                    st.error("OpenAI API 連線失敗，請檢查金鑰及API額度。")
+                except Exception:
+                    st.error("分析服務暫時無法使用，請稍後再試，並檢查 OpenAI API 額度。")
